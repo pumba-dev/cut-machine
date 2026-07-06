@@ -1,5 +1,15 @@
 {
   "env": {
     "PYTHONUTF8": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(python scripts/*)",
+      "Bash(python -m compileall*)",
+      "Bash(python -m yt_dlp*)",
+      "Bash(ffmpeg *)",
+      "Bash(ffprobe *)",
+      "Bash(yt-dlp *)"
+    ]
   }
 }

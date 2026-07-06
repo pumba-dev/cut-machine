@@ -41,6 +41,9 @@ class YouTubeSource(VideoSource):
             "no_warnings": True,
             "noplaylist": True,
             "restrictfilenames": True,
+            # yt-dlp >= 2025.11 exige runtime JS para os desafios do YouTube;
+            # o default e deno, que nao existe nesta maquina - Node sim.
+            "js_runtimes": {"node": {}},
         }
         cookies = ROOT / "secrets" / "youtube-cookies.txt"
         if cookies.exists():
