@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "accounts": [
+    {
+      "platform": "youtube",
+      "id": "principal",
+      "label": "Canal principal",
+      "credentials_dir": "secrets/youtube/principal",
+      "default": true,
+      "daily_upload_limit": 5
+    }
+  ]
+}

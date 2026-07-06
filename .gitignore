@@ -1,0 +1,8 @@
+workspace/
+secrets/
+__pycache__/
+*.pyc
+.venv/
+*.mp4
+*.m4a
+*.webm
