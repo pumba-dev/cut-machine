@@ -44,6 +44,10 @@ class YouTubeSource(VideoSource):
             # yt-dlp >= 2025.11 exige runtime JS para os desafios do YouTube;
             # o default e deno, que nao existe nesta maquina - Node sim.
             "js_runtimes": {"node": {}},
+            # Solver oficial de desafios do yt-dlp (baixado do GitHub deles,
+            # cacheado local). Sem ele o YouTube nao entrega formato nenhum.
+            # Autorizado pelo dono do repo em 2026-07-06.
+            "remote_components": ["ejs:github"],
         }
         cookies = ROOT / "secrets" / "youtube-cookies.txt"
         if cookies.exists():

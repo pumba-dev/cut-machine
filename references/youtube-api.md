@@ -37,10 +37,11 @@ Não existe flag de Short na API: vídeo vertical/quadrado com ≤ 3 min vira Sh
 
 ## Download bloqueado por anti-bot ("Sign in to confirm you're not a bot")
 
-O YouTube bloqueia downloads sem sessão em muitos IPs residenciais. Constatado neste ambiente (2026-07): todos os `player_client` falham sem credencial, e `--cookies-from-browser` NÃO funciona com Chrome/Edge atuais no Windows (criptografia app-bound, yt-dlp issues #7271/#10927). Saídas, em ordem de preferência:
+O YouTube bloqueia downloads sem sessão em muitos IPs residenciais. Constatado neste ambiente (2026-07): todos os `player_client` falham sem credencial, e `--cookies-from-browser` NÃO funciona com Chrome/Edge atuais no Windows (criptografia app-bound, yt-dlp issues #7271/#10927). Configuração VALIDADA nesta máquina (2026-07-06), em camadas:
 
-1. **Cookies exportados manualmente** (implementado): instalar a extensão "Get cookies.txt LOCALLY" no Chrome/Edge, abrir youtube.com logado, exportar e salvar como `secrets/youtube-cookies.txt` (formato Netscape). `core/sources/youtube.py` detecta o arquivo automaticamente. Cookies expiram de tempos em tempos — re-exportar quando o erro voltar. Recomendado: usar uma conta Google secundária, pois a conta dos cookies fica associada ao volume de downloads.
-2. **Plugin PO token** (`bgutil-ytdlp-pot-provider`, requer Node): dispensa cookies, mas instala código de terceiros — decisão do dono do repo.
+1. **Runtime JS + solver EJS** (obrigatório, já fixo em `core/sources/youtube.py`): `js_runtimes: {"node": {}}` + `remote_components: ["ejs:github"]`. O yt-dlp moderno não entrega NENHUM formato sem resolver os desafios JS do YouTube; o solver é componente oficial do projeto yt-dlp, baixado do GitHub deles e cacheado localmente (autorizado pelo dono do repo).
+2. **Cookies exportados** (implementado, detecção automática): extensão "Get cookies.txt LOCALLY" → salvar como `secrets/youtube-cookies.txt` (formato Netscape). Exportar em janela anônima e fechá-la sem deslogar (rotação de cookies invalida exports de sessão aberta). Re-exportar quando o erro de bot voltar. Recomendado: conta Google secundária.
+3. **Plugin PO token** (reserva, instalado e buildado): `bgutil-ytdlp-pot-provider` (pip) + repo em `C:\Users\eduar\bgutil-ytdlp-pot-provider` (modo script, detectado automaticamente pelo plugin — sem daemon). Se o bot-check voltar mesmo com cookies, já está ativo. Atualizar: `git pull` + `npm ci` + `npx tsc` na pasta `server/`.
 
 ## Metadados do upload
 
