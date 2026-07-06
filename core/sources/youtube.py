@@ -3,13 +3,20 @@
 O import de yt_dlp acontece dentro dos metodos para que este modulo importe
 mesmo sem a dependencia instalada (o registry precisa carregar sempre).
 
-Fallback anti-bot: se o YouTube exigir login/captcha ("Sign in to confirm
-you're not a bot"), ha duas saidas (ver references/youtube-api.md):
-1. Exportar cookies logados para secrets/youtube-cookies.txt (formato Netscape,
-   via extensao "Get cookies.txt LOCALLY") - detectado automaticamente abaixo.
+Autenticacao anti-bot ("Sign in to confirm you're not a bot" / LOGIN_REQUIRED),
+em camadas (ver references/youtube-api.md):
+1. Cookies exportados (principal): secrets/youtube-cookies.txt (Netscape, via
+   extensao "Get cookies.txt LOCALLY") - detectado automaticamente abaixo.
    cookiesfrombrowser NAO funciona com Chrome/Edge atuais no Windows
-   (criptografia app-bound - yt-dlp issue #10927).
-2. Plugin bgutil-ytdlp-pot-provider (PO token, requer Node) - decisao do usuario.
+   (criptografia app-bound - yt-dlp issue #10927). Sessao e fragil: poucas
+   dezenas de chamadas em minutos ja foram suficientes para o YouTube
+   invalidar o cookie (LOGIN_REQUIRED). Reduzir chamadas repetidas/testes em
+   rajada; re-exportar (janela anonima, fechar sem deslogar) quando quebrar.
+2. Plugin bgutil-ytdlp-pot-provider (PO token, requer Node) - reserva, ja
+   instalado e buildado (ver references/youtube-api.md).
+NAO USAR: OAuth2 device-flow (yt-dlp-youtube-oauth2) - testado em 2026-07-06,
+falha com HTTP 400 no passo de device code; repositorio arquivado (jan/2026),
+bug aberto sem correcao desde nov/2024. Projeto morto, nao reativar.
 """
 import re
 from pathlib import Path
