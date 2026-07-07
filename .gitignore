@@ -1,4 +1,5 @@
-workspace/
+TODO.md
+video-output/
 secrets/
 __pycache__/
 *.pyc

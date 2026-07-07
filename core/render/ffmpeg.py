@@ -72,23 +72,26 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None) -> di
         raise FileNotFoundError(f"source.mp4 nao encontrado: {source}")
 
     out_path = paths.clip_output_path(video_id, clip["id"])
-    clips_dir = out_path.parent
-    clips_dir.mkdir(parents=True, exist_ok=True)
-    # cwd na pasta clips/ + caminhos relativos: path absoluto dentro do
+    clip_dir = out_path.parent
+    clip_dir.mkdir(parents=True, exist_ok=True)
+    # cwd na pasta do clip + caminhos relativos: path absoluto dentro do
     # filtro ass= exige escaping duplo no Windows e quebra facil.
-    source_rel = os.path.relpath(source, clips_dir)
+    source_rel = os.path.relpath(source, clip_dir)
+    # id do YouTube pode comecar com '-'; sem o prefixo ./ o ffmpeg leria o
+    # nome do output como opcao.
+    out_name = "./" + out_path.name
 
     if rules["burn_captions"]:
         if not transcript:
             raise ValueError(f"{clip['id']}: formato {fmt} exige transcript para legendas")
         ass_path = paths.clip_ass_path(video_id, clip["id"])
         ass_path.write_text(build_ass(clip, transcript), encoding="utf-8")
-        cmd = build_short_cmd(start, dur, ass_path.name, out_path.name, source=source_rel)
+        cmd = build_short_cmd(start, dur, ass_path.name, out_name, source=source_rel)
     else:
-        cmd = build_corte_cmd(start, dur, out_path.name, source=source_rel)
+        cmd = build_corte_cmd(start, dur, out_name, source=source_rel)
 
     proc = subprocess.run(
-        cmd, cwd=str(clips_dir), capture_output=True,
+        cmd, cwd=str(clip_dir), capture_output=True,
         text=True, encoding="utf-8", errors="replace",
     )
     if proc.returncode != 0:

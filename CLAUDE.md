@@ -13,7 +13,7 @@ usuário e **retomar** pipelines interrompidos. Você nunca toca em tokens/secre
 download -> transcribe -> plan -> copy -> render -> qa -> publish
 ```
 
-- Estado **por fase**: `workspace/<video_id>/state.json` (`core.state`, status `pending|running|partial|done|failed`).
+- Estado **por fase**: `video-output/<video_id>/state.json` (`core.state`, status `pending|running|partial|done|failed`).
 - Estado **por clip**: `clips.json.clips[].status` (`planned -> approved -> rendering -> rendered -> queued -> uploading -> published`; desvios `rejected`/`failed` com `error` obrigatório).
 
 **REGRA DE OURO**: antes de QUALQUER etapa, leia `state.json`. Nunca refaça etapa `done`.
@@ -39,6 +39,7 @@ download -> transcribe -> plan -> copy -> render -> qa -> publish
 - Timestamps sempre em **segundos float** (`1234.56`), alinhados a fronteiras de palavras do `transcript.json`.
 - **Contrato de script**: todo CLI em `scripts/` é idempotente (emite `{"ok": true, "skipped": true}` se já feito), imprime **UMA linha JSON como último output** no stdout (`core.cli.emit`), atualiza `state.json` sozinho, I/O sempre UTF-8. Você lê só essa última linha.
 - `clips.json` é o **único contrato** entre subagentes e scripts — nenhum dado de clip vive fora dele. Dono por campo (ver `core/contracts.py`): clip-scout cria o clip + análise; copywriter preenche copy; `render_clip.py` preenche `render.*`; `upload_clip.py` preenche `publish.*`; humano/você transiciona `approved/rejected`. **Ninguém sobrescreve campo de outro dono.**
+- Cada clip tem subpasta própria `video-output/<video_id>/<clip_id>/` com `<clip_id>.mp4`, `<clip_id>.ass` (só shorts) e `metadata.json` — este último é **derivado** de `clips.json` (gerado por `render_clip.py`, regenerado por `upload_clip.py` após publish). Ninguém edita `metadata.json` à mão; subagentes LLM não escrevem nele.
 - Formatos (`core.contracts.FORMAT_RULES`): `short` 15–59s, 1080x1920, crop central, legendas queimadas; `corte` 120–600s, 1920x1080, sem burn.
 
 ## 5. Comandos canônicos
@@ -62,7 +63,7 @@ Render é **sequencial** por clip (GPU 6GB não comporta paralelismo folgado).
 | `qa-reviewer` | após `render` | ffprobe em cada mp4 (resolução, duração ±0.5s, áudio); mantém `rendered` ou marca `failed` |
 | `publisher` | só após aprovação explícita do usuário | roda `upload_clip.py` por clip, valida retorno, registra `publish.*`; em `quotaExceeded` para tudo e reporta |
 
-Passe sempre no prompt do subagente: `video_id`, caminho do workspace e o que se espera de volta (resumo curto, não o JSON inteiro).
+Passe sempre no prompt do subagente: `video_id`, caminho da pasta do vídeo (`video-output/<video_id>`) e o que se espera de volta (resumo curto, não o JSON inteiro).
 
 ## 7. Skills
 
@@ -77,13 +78,16 @@ Passe sempre no prompt do subagente: `video_id`, caminho do workspace e o que se
 
 - Contas em `config/accounts.json`; credenciais isoladas em `secrets/<plataforma>/<conta>/`.
   Resolução via `core.accounts.get_account(platform, account_id)` (default por flag `"default"`).
+- Cada conta define a identidade editorial: `channel_name`, `niche` e `default_hashtags`.
+  O copywriter usa o nicho para coerência e completa as hashtags específicas (extraídas da
+  transcrição) com as `default_hashtags` da conta. Passe o `account_id` no prompt dele.
 - Fontes: `core/sources/` — `VideoSource.matches(url)/fetch()` + registry `get_source(url)`.
 - Destinos: `core/publishers/` — `Publisher.authenticate()/upload()` + registry `get_publisher(platform)`.
 - **Nova plataforma = nova classe + registro no `__init__.py`. O schema de `clips.json` NÃO muda** (`publish.platform` já parametrizado).
 
 ## 9. Checkpoints humanos OBRIGATÓRIOS
 
-1. **Pós-plan/copy, pré-render**: apresente tabela (id | formato | start–end | duração | score | título) e peça aprovação. Aplique `rejected` conforme resposta; demais viram `approved`. Default: sugerir aprovação apenas de clips com `score >= 70`.
+1. **Pós-plan/copy, pré-render**: rode `python scripts/validate_plan.py --video-id <id>` ANTES da tabela. `errors` → re-spawn do copywriter **1 vez** com os erros no prompt; `warnings` → liste sob a tabela como avisos de copy para o humano decidir. Apresente tabela (id | formato | start–end | duração | score | chars | título **completo**) e peça aprovação. Aplique `rejected` conforme resposta; demais viram `approved`. Default: sugerir aprovação apenas de clips com `score >= 70`.
 2. **Pré-publish**: confirme quota (upload = 1600 unidades; 10k/dia → **~6 uploads/dia**; respeite `daily_upload_limit` da conta). Excedente fica `queued` ordenado por score.
 
 **Uploads via API são SEMPRE `privacy: private`** — projeto GCP não-auditado trava uploads como
@@ -102,6 +106,7 @@ Nunca tente contornar isso.
 - `docs/ARQUITETURA.md` — fonte de verdade: estrutura, interfaces, decisões técnicas fixas (Whisper int8, yt-dlp, ffmpeg, ASS, quota).
 - `docs/PLAN.md` — plano de implementação e progresso.
 - `references/heuristicas-virais.md` — rubrica de score e padrões de hook/título (clip-scout, copywriter).
+- `references/padrao-copy.md` — padrão editorial de título/descrição/tags (copywriter, fonte única).
 - `references/formatos-redes.md` — limites por plataforma e zonas seguras (copywriter, qa-reviewer).
 - `references/estilo-legendas.md` — spec das legendas ASS queimadas.
 - `references/youtube-api.md` — GCP, OAuth, quota, videos.insert (skill /setup, publisher).

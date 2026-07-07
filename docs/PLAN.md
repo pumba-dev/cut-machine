@@ -23,7 +23,7 @@ O Claude Code é o orquestrador (CLAUDE.md), subagentes fazem o trabalho criativ
 social-accounts-agent/
 ├── CLAUDE.md                        # orquestrador: papel, máquina de estados, convenções, comandos canônicos
 ├── requirements.txt
-├── .gitignore                       # workspace/, secrets/, *.mp4
+├── .gitignore                       # video-output/, secrets/, *.mp4
 ├── .claude/
 │   ├── settings.json                # env PYTHONUTF8=1; permissões: python scripts/*, ffmpeg, ffprobe, yt-dlp
 │   ├── agents/
@@ -52,20 +52,20 @@ social-accounts-agent/
 │   ├── auth_youtube.py              # OAuth installed-app flow
 │   └── upload_youtube.py            # videos.insert resumable
 ├── secrets/                         # gitignored: credentials.json, token.json
-└── workspace/<video_id>/            # gitignored
+└── video-output/<video_id>/         # gitignored
     ├── state.json                   # progresso por fase
     ├── source.mp4 + source.info.json
     ├── transcript.json              # word-level (para render e ajuste fino)
     ├── transcript.compact.json      # só segmentos (para o clip-scout não estourar contexto)
     ├── clips.json                   # CONTRATO CENTRAL
-    └── clips/<clip_id>.ass|.mp4
+    └── <clip_id>/                   # <clip_id>.mp4, <clip_id>.ass (só shorts), metadata.json (derivado de clips.json)
 ```
 
 ## Convenções (vão no CLAUDE.md)
 
 - Pipeline: `download → transcribe → plan → copy → render → qa → publish`. Antes de qualquer etapa, ler `state.json`; nunca refazer etapa `done`.
 - `video_id` = ID do YouTube; `clip_id` = `<video_id>-s01` (short) / `<video_id>-c01` (corte).
-- Todo script: aceita `--workspace workspace/<id>`, é idempotente, atualiza `state.json` sozinho, imprime 1 linha JSON no stdout como último output (`{"ok": true, ...}`). UTF-8 em todo I/O (`encoding="utf-8"`; `PYTHONUTF8=1` no env do settings.json).
+- Todo script: aceita `--workspace video-output/<id>`, é idempotente, atualiza `state.json` sozinho, imprime 1 linha JSON no stdout como último output (`{"ok": true, ...}`). UTF-8 em todo I/O (`encoding="utf-8"`; `PYTHONUTF8=1` no env do settings.json).
 - Timestamps em segundos float, alinhados a fronteiras de palavra do transcript.
 - Checkpoint humano: entre plan/copy e render (aprovar tabela de clips); entre qa e publish (confirmar quota).
 - LLM faz: seleção de momentos, timestamps finos, copy, decisão de retry. Script faz: download, transcrição, ASS, ffmpeg, OAuth, upload. LLM nunca toca em tokens/secrets.
@@ -96,9 +96,9 @@ social-accounts-agent/
       "score": 87,
       "score_breakdown": {"hook": 30, "retencao": 27, "compartilhabilidade": 18, "clareza": 12},
       "title": null, "title_alts": [], "description": null, "tags": [],   // copywriter preenche
-      "captions": {"burn": true, "ass_path": "clips/abc123-s01.ass"},
+      "captions": {"burn": true, "ass_path": "video-output/abc123/abc123-s01/abc123-s01.ass"},
       "render": {"crop": "center", "target_resolution": "1080x1920",
-                 "output_path": "clips/abc123-s01.mp4", "rendered_at": null, "actual_duration_s": null},
+                 "output_path": "video-output/abc123/abc123-s01/abc123-s01.mp4", "rendered_at": null, "actual_duration_s": null},
       "publish": {"platform": "youtube", "privacy": "private", "category_id": "22",
                   "made_for_kids": false, "youtube_video_id": null, "youtube_url": null, "published_at": null},
       "status": "planned",
@@ -138,7 +138,7 @@ Por vídeo: `stages: {download|transcribe|plan|copy|render|qa|publish: {status: 
 - Smoke test: `python -c "import ctranslate2; print(ctranslate2.get_cuda_device_count())"` → `1`.
 
 ### Download
-- yt-dlp API Python: formato `bv*[ext=mp4][vcodec^=avc1][height<=1080]+ba[ext=m4a]/b[ext=mp4][height<=1080]/b`, `merge_output_format=mp4`, `writeinfojson`, `restrictfilenames`, `noplaylist`, saída `workspace/<id>/source.mp4`.
+- yt-dlp API Python: formato `bv*[ext=mp4][vcodec^=avc1][height<=1080]+ba[ext=m4a]/b[ext=mp4][height<=1080]/b`, `merge_output_format=mp4`, `writeinfojson`, `restrictfilenames`, `noplaylist`, saída `video-output/<id>/source.mp4`.
 - Fallback anti-bot documentado: `--cookies-from-browser` (YouTube exige PO token/cookies cada vez mais).
 
 ### Render (ffmpeg — libx264, NVENC fica para depois)

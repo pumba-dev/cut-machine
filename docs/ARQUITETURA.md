@@ -8,8 +8,8 @@ Pipeline de cortes virais orquestrado pelo Claude Code. Fluxo:
 1. **LLM vs determinístico**: subagentes (LLM) fazem seleção de momentos, timestamps finos e copy; scripts Python fazem download, transcrição, ffmpeg, OAuth e upload. LLM nunca toca em tokens/secrets.
 2. **Abstração de fonte**: `core/sources/` — `VideoSource` (ABC) com registry por URL. Hoje YouTube; amanhã qualquer plataforma implementa `matches(url)` + `fetch()`.
 3. **Abstração de destino**: `core/publishers/` — `Publisher` (ABC) com registry por plataforma. Hoje YouTube; amanhã TikTok/Instagram/Facebook implementam `authenticate()` + `upload()`.
-4. **Multi-conta**: `config/accounts.json` registra contas por plataforma; credenciais isoladas em `secrets/<plataforma>/<conta>/`. Publishers recebem a conta resolvida por `core.accounts.get_account(platform, account_id)`.
-5. **Estado retomável**: `workspace/<video_id>/state.json` (por fase, via `core.state`) + `clips.json.clips[].status` (por clip). Toda etapa lê estado antes; nunca refaz etapa `done`. Escrita atômica.
+4. **Multi-conta**: `config/accounts.json` registra contas por plataforma; credenciais isoladas em `secrets/<plataforma>/<conta>/`. Publishers recebem a conta resolvida por `core.accounts.get_account(platform, account_id)`. Cada conta carrega a identidade editorial do canal: `channel_name`, `niche` (nicho de publicação — todo clip deve ser coerente com ele) e `default_hashtags` (hashtags padrão do canal, usadas pelo copywriter para completar as específicas tiradas da transcrição).
+5. **Estado retomável**: `video-output/<video_id>/state.json` (por fase, via `core.state`) + `clips.json.clips[].status` (por clip). Toda etapa lê estado antes; nunca refaz etapa `done`. Escrita atômica.
 6. **Contrato de script**: todo CLI em `scripts/` imprime UMA linha JSON no stdout como último output (`core.cli.emit`), é idempotente e atualiza o estado sozinho. UTF-8 em todo I/O.
 
 ## Estrutura
@@ -19,7 +19,7 @@ CLAUDE.md                      # orquestrador
 config/accounts.json           # contas por plataforma
 .claude/agents/                # clip-scout, copywriter, qa-reviewer, publisher
 .claude/skills/                # setup, produzir, planejar, renderizar, publicar, status
-references/                    # heuristicas-virais, formatos-redes, estilo-legendas, youtube-api
+references/                    # heuristicas-virais, padrao-copy, formatos-redes, estilo-legendas, youtube-api
 core/                          # pacote Python
   paths.py state.py contracts.py media.py accounts.py cli.py
   sources/    base.py youtube.py       # + __init__.py com get_source(url)
@@ -27,8 +27,9 @@ core/                          # pacote Python
   render/     captions.py ffmpeg.py
   publishers/ base.py youtube.py       # + __init__.py com get_publisher(platform)
 scripts/                       # CLIs finos sobre o core
-workspace/<video_id>/          # gitignored: state.json, source.mp4, source.json,
-                               #   source.info.json, transcript*.json, clips.json, clips/
+video-output/<video_id>/       # gitignored: state.json, source.mp4, source.json,
+                               #   source.info.json, transcript*.json, clips.json
+  <clip_id>/                   # por clip: <clip_id>.mp4, <clip_id>.ass (só shorts), metadata.json
 secrets/<plataforma>/<conta>/  # gitignored: credentials.json, token.json, upload_log.json
 ```
 
@@ -56,7 +57,7 @@ class VideoSource(ABC):
         """video_id canonico da URL sem baixar (idempotencia do download)."""
     def fetch(self, url: str, workspace: Path) -> dict:
         """Baixa video + metadados. Retorna dict source (contrato abaixo),
-        que download.py grava em workspace/<id>/source.json."""
+        que download.py grava em video-output/<id>/source.json."""
 
 # retorno de fetch() — vira o bloco "source" do clips.json:
 # {"video_id", "url", "title", "channel", "duration_s", "width", "height",
@@ -79,7 +80,8 @@ def get_publisher(platform: str) -> Publisher
 
 ## Contratos de dados
 
-- `clips.json`: ver `core/contracts.py` (FORMAT_RULES, CLIP_STATUSES, validate_plan). Formatos: `short` 15–59s 1080x1920 crop central legendas queimadas; `corte` 120–600s 1920x1080 sem burn. Bloco `publish` de cada clip: `{"platform", "account", "privacy": "private", "category_id": "22", "made_for_kids": false, "remote_id": null, "url": null, "published_at": null}`.
+- `clips.json`: ver `core/contracts.py` (FORMAT_RULES, CLIP_STATUSES, validate_plan com copy-checks duros, `lint_copy` com warnings do padrão editorial — `references/padrao-copy.md`). Call site canônico da validação: `python scripts/validate_plan.py --video-id <id>` → 1 linha JSON `{ok, errors, warnings, clips_com_copy}`; errors → exit 1. Formatos: `short` 15–59s 1080x1920 crop central legendas queimadas; `corte` 120–600s 1920x1080 sem burn. Bloco `publish` de cada clip: `{"platform", "account", "privacy": "private", "category_id": "22", "made_for_kids": false, "remote_id": null, "url": null, "published_at": null}`.
+- `metadata.json` (em `video-output/<video_id>/<clip_id>/`): artefato **derivado** de `clips.json` (que segue como única fonte de verdade e único contrato entre subagentes e scripts). Gerado por `render_clip.py` no render e regenerado por `upload_clip.py` após o publish. Contém: `clip_id`, `video_id`, `format`, `status`, `title`, `title_alts`, `description`, `tags`, `hashtags`, `hook_text`, `score`, `start/end/duration_s`, `source{url,title,channel}`, `render{}`, `publish{}`. `hashtags` deriva do bloco final de hashtags da `description` (fallback: as 5 primeiras `tags`). Ninguém edita metadata.json à mão; subagentes LLM não escrevem nele.
 - `transcript.json`: `{"video_id", "language", "model", "duration", "segments": [{"id", "start", "end", "text", "words": [{"w", "start", "end", "prob"}]}]}`. + `transcript.compact.json` (sem `words`, para o clip-scout) + `transcript.srt` (conferência humana).
 - `state.json`: ver `core/state.py`.
 

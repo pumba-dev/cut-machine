@@ -136,9 +136,18 @@ def main() -> None:
     state.set_stage(st, "publish", _publish_stage_status(plan))
     state.save(st_path, st)
 
+    # metadata.json e derivado e regeneravel: falha aqui nao pode engolir a
+    # contagem de quota nem a linha JSON de um upload que ja aconteceu.
+    extra = {}
+    try:
+        contracts.save_clip_metadata(
+            paths.clip_metadata_path(args.video_id, args.clip), plan, clip)
+    except Exception as exc:
+        extra["metadata_error"] = str(exc) or exc.__class__.__name__
+
     cli.emit(True, clip=args.clip, platform=platform, account=account["id"],
              remote_id=result["remote_id"], url=result["url"],
-             published_at=result["published_at"])
+             published_at=result["published_at"], **extra)
 
 
 if __name__ == "__main__":

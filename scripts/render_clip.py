@@ -20,6 +20,27 @@ def _output_rel(video_id: str, clip_id: str) -> str:
     return paths.clip_output_path(video_id, clip_id).relative_to(paths.ROOT).as_posix()
 
 
+def _skip_result(video_id: str, plan: dict, clip: dict) -> dict:
+    """Resultado de clip ja rendered: regenera metadata.json so se o mp4 existe."""
+    result = {"clip_id": clip["id"], "status": "rendered",
+              "output": _output_rel(video_id, clip["id"])}
+    if paths.clip_output_path(video_id, clip["id"]).exists():
+        meta_err = _save_metadata(video_id, plan, clip)
+        if meta_err:
+            result["metadata_error"] = meta_err
+    return result
+
+
+def _save_metadata(video_id: str, plan: dict, clip: dict) -> str | None:
+    """metadata.json e derivado e regeneravel: falha aqui nunca derruba o clip."""
+    try:
+        contracts.save_clip_metadata(
+            paths.clip_metadata_path(video_id, clip["id"]), plan, clip)
+        return None
+    except Exception as exc:
+        return str(exc) or exc.__class__.__name__
+
+
 def _clip_error(clip: dict) -> str | None:
     """Valida format/start/end/duracao do clip contra FORMAT_RULES."""
     fmt = clip.get("format")
@@ -68,18 +89,16 @@ def main() -> None:
             fail(str(exc))
         clip = targets[0]
         if clip.get("status") == "rendered" and paths.clip_output_path(video_id, clip["id"]).exists():
-            emit(True, skipped=True, video_id=video_id, results=[
-                {"clip_id": clip["id"], "status": "rendered",
-                 "output": _output_rel(video_id, clip["id"])}])
+            emit(True, skipped=True, video_id=video_id,
+                 results=[_skip_result(video_id, plan, clip)])
             return
     else:
         targets = [c for c in plan["clips"] if c.get("status") == "approved"]
         if not targets:
             rendered = [c for c in plan["clips"] if c.get("status") == "rendered"]
             if rendered:
-                emit(True, skipped=True, video_id=video_id, results=[
-                    {"clip_id": c["id"], "status": "rendered",
-                     "output": _output_rel(video_id, c["id"])} for c in rendered])
+                emit(True, skipped=True, video_id=video_id,
+                     results=[_skip_result(video_id, plan, c) for c in rendered])
                 return
             fail("nenhum clip com status approved em clips.json")
 
@@ -124,8 +143,12 @@ def main() -> None:
         render_block["actual_duration_s"] = round(info["duration_s"], 3)
         contracts.set_clip_status(clip, "rendered")
         contracts.save_plan(clips_file, plan)
-        results.append({"clip_id": cid, "status": "rendered",
-                        "output": render_block["output_path"]})
+        result = {"clip_id": cid, "status": "rendered",
+                  "output": render_block["output_path"]}
+        meta_err = _save_metadata(video_id, plan, clip)
+        if meta_err:
+            result["metadata_error"] = meta_err
+        results.append(result)
 
     rendered = [r for r in results if r["status"] == "rendered"]
     failed = [r for r in results if r["status"] == "failed"]

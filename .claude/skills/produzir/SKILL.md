@@ -16,7 +16,7 @@ Voce e o orquestrador: delega analise criativa a subagentes (Task) e execucao de
 ## 1. Retomada
 
 1. Extraia o `video_id` da URL (padroes: `watch?v=<id>`, `youtu.be/<id>`, `/shorts/<id>`, `/live/<id>` — id de 11 chars).
-2. Se `workspace/<video_id>/state.json` **existe**: leia-o, identifique a primeira etapa nao-`done` e **avise o usuario** ("retomando <video_id> a partir da etapa X"). Pule direto para o passo correspondente abaixo. Etapa `running` orfa (processo morreu): re-rode o script — ele e idempotente e verifica os artefatos.
+2. Se `video-output/<video_id>/state.json` **existe**: leia-o, identifique a primeira etapa nao-`done` e **avise o usuario** ("retomando <video_id> a partir da etapa X"). Pule direto para o passo correspondente abaixo. Etapa `running` orfa (processo morreu): re-rode o script — ele e idempotente e verifica os artefatos.
 3. Se nao existe: pipeline completo desde o inicio.
 
 ## 2. Download e transcricao
@@ -30,7 +30,7 @@ Sequencial (transcribe depende de `source.mp4`). Nao passe `--model/--device/--c
 
 ## 3. Planejamento (clip-scout)
 
-Spawne o subagente `clip-scout` via Task, informando no prompt: o workspace (`workspace/<video_id>/`) e a conta de publicacao resolvida. Ele le `transcript.compact.json` + `references/` e escreve os candidatos em `clips.json` com `status: "planned"`.
+Spawne o subagente `clip-scout` via Task, informando no prompt: o workspace (`video-output/<video_id>/`) e a conta de publicacao resolvida. Ele le `transcript.compact.json` + `references/` e escreve os candidatos em `clips.json` com `status: "planned"`.
 
 **Regra inviolavel**: se o clip-scout voltar com **0 clips de score >= 60, isso e um resultado valido**. Nao invente cortes, nao rebaixe criterios, nao re-rode "para tentar de novo". Encerre graciosamente com o relatorio final explicando que o video nao rendeu cortes acima do corte de qualidade.
 
@@ -38,15 +38,25 @@ Apos validar o retorno (clips.json existe e respeita FORMAT_RULES), marque a eta
 
 ## 4. Copy (copywriter)
 
-Spawne o subagente `copywriter` via Task com o mesmo workspace. Ele preenche `title`, `title_alts`, `description`, `tags` dos clips `planned` em `clips.json`. Depois, marque `copy` como `done` em `state.json` (mesmo procedimento da etapa plan).
+Spawne o subagente `copywriter` via Task com o mesmo workspace e o `account_id` da conta alvo (`--conta` ou a default de `config/accounts.json`). Ele preenche `title`, `title_alts`, `description`, `tags` dos clips `planned` em `clips.json`, seguindo `references/padrao-copy.md` e a identidade do canal (`channel_name`, `niche`, `default_hashtags` da conta).
+
+Depois, valide a copy:
+
+```
+python scripts/validate_plan.py --video-id <video_id>
+```
+
+A ultima linha e um JSON `{ok, errors, warnings, clips_com_copy}`. Se houver `errors`: re-spawne o copywriter **1 vez** com os erros no prompt e re-valide (e a regra de max 1 retry); se persistirem, pare e reporte. `warnings` nao bloqueiam — guarde-os para listar no checkpoint. Por fim, marque `copy` como `done` em `state.json` (mesmo procedimento da etapa plan).
 
 ## 5. CHECKPOINT humano 1 — aprovacao dos cortes
 
 Leia `clips.json` e apresente a tabela:
 
 ```
-id | formato | start-end | dur | score | titulo
+id | formato | start-end | dur | score | chars | titulo
 ```
+
+`chars` = numero de caracteres do `title` (alvo <= 85, duro 100 — ver `references/padrao-copy.md`); mostre o **titulo completo**, sem truncar. Logo abaixo da tabela, liste os `warnings` do `validate_plan.py` para o usuario decidir se ajusta algo.
 
 Pergunte ao usuario o que aprovar (via AskUserQuestion se disponivel, senao texto livre): aprovar todos, rejeitar alguns por id, ou editar titulos. Aplique a resposta editando `clips.json`: clips aceitos -> `status: "approved"`, recusados -> `status: "rejected"` (transicao approved/rejected e do humano/orquestrador — nao mexa em campos de outros donos). Se o usuario nao aprovar nenhum, encerre com relatorio.
 
@@ -60,7 +70,7 @@ Uma chamada so; o script renderiza os aprovados **sequencialmente** (GPU de 6GB 
 
 ## 7. QA (qa-reviewer)
 
-Spawne o subagente `qa-reviewer` via Task com o workspace. Ele valida cada `clips/<clip_id>.mp4` com ffprobe (resolucao, duracao, audio) e marca `failed` + `error` no que reprovar. Depois, marque `qa` como `done` em `state.json` (subagentes nao mexem em `state.json`).
+Spawne o subagente `qa-reviewer` via Task com o workspace. Ele valida cada `<clip_id>/<clip_id>.mp4` com ffprobe (resolucao, duracao, audio) e marca `failed` + `error` no que reprovar. Depois, marque `qa` como `done` em `state.json` (subagentes nao mexem em `state.json`).
 
 ## 8. CHECKPOINT humano 2 — quota e publicacao
 

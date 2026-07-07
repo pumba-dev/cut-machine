@@ -9,7 +9,7 @@ Executa as fases `render` + `qa` do pipeline.
 
 ## Pre-condicoes
 
-1. Leia `workspace/<video_id>/state.json` e `workspace/<video_id>/clips.json`. Se nao existem, pare e oriente: rodar `/produzir` ou `/planejar` primeiro.
+1. Leia `video-output/<video_id>/state.json` e `video-output/<video_id>/clips.json`. Se nao existem, pare e oriente: rodar `/produzir` ou `/planejar` primeiro.
 2. Deve haver ao menos 1 clip com `status: "approved"` (ou o `clip_id` pedido deve existir em `clips.json`). Se todos ainda estao `planned`, oriente a rodar `/planejar <video_id>` para o checkpoint de aprovacao. Se o clip pedido esta `rejected`, so renderize com confirmacao explicita do usuario (mude antes para `approved` em `clips.json`).
 
 ## 1. Render
@@ -26,11 +26,11 @@ Todos os aprovados (uma unica chamada; o script itera **sequencialmente** — na
 python scripts/render_clip.py --video-id <video_id> --all-approved
 ```
 
-Contrato: a ultima linha do stdout e JSON `{"ok": ...}`. Clip ja `rendered` nao e refeito — o script emite `{"ok": true, "skipped": true}`. Falha em um clip nao invalida os demais (estado fino por clip vive em `clips.json`); em `ok: false`, leia stderr e `state.json.last_error`, tente 1 correcao obvia (re-rodar), senao reporte.
+Contrato: a ultima linha do stdout e JSON `{"ok": ...}`. Clip ja `rendered` nao e refeito — o script emite `{"ok": true, "skipped": true}`. Cada clip sai em `video-output/<video_id>/<clip_id>/` (`<clip_id>.mp4`, `.ass` se short, e `metadata.json` gravado pelo script ao lado do mp4 — derivado de `clips.json`, ninguem edita a mao). Falha em um clip nao invalida os demais (estado fino por clip vive em `clips.json`); em `ok: false`, leia stderr e `state.json.last_error`, tente 1 correcao obvia (re-rodar), senao reporte.
 
 ## 2. QA (qa-reviewer)
 
-Spawne o subagente `qa-reviewer` via Task com o workspace. Ele roda ffprobe em cada `clips/<clip_id>.mp4` renderizado e valida:
+Spawne o subagente `qa-reviewer` via Task com o workspace. Ele roda ffprobe em cada `<clip_id>/<clip_id>.mp4` renderizado e valida:
 
 - short: 1080x1920, duracao 15-59s, legendas queimadas;
 - corte: 1920x1080, 120-600s;

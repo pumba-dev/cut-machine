@@ -70,20 +70,18 @@ Score = soma ponderada de 4 eixos. Avaliar cada eixo de 0–10 e multiplicar pel
 ## 5. Títulos, descrições e metadados (padrões BR)
 
 ### Padrões de título que funcionam (sem clickbait mentiroso)
+Aplicam-se ao **miolo** do título (o template completo `CATEGORIA | miolo | hashtags` está em `references/padrao-copy.md`):
 - **Curiosity gap honesto:** "O erro que quase quebrou a empresa dele" — o vídeo DEVE revelar o erro.
 - **Número específico:** "3 sinais de que você está sendo enrolado", "Perdeu R$ 200 mil com isso".
 - **Polêmica/posição:** "Faculdade é perda de tempo? A resposta dele surpreende", "Por que ele DISCORDA de todo mundo sobre X".
 - **Citação de impacto:** a frase mais forte do clip, entre aspas.
-- Regras: ≤ 80 caracteres (100 é o limite, mas mobile trunca); primeira metade carrega a informação; CAPS em NO MÁXIMO 1 palavra; máximo 1 emoji; nunca prometer o que o clip não entrega (mata retenção e o canal).
+- Regras: miolo ≤ 55 chars; template e orçamento total em `references/padrao-copy.md`; primeira metade carrega a informação; CAPS em NO MÁXIMO 1 palavra; máximo 1 emoji; nunca prometer o que o clip não entrega (mata retenção e o canal).
 
 ### Descrição
-- `short`: 1–2 linhas. Frase que complementa (não repete) o título + pergunta que puxa comentário + hashtags.
-- `corte`: 2–4 linhas. Contexto do episódio, link/crédito do vídeo original, timestamps se houver capítulos.
-- Crédito obrigatório ao canal original quando for corte de terceiros.
+- Estrutura em 4 blocos (CTA fixa, crédito, conteúdo, hashtags): `references/padrao-copy.md` é a fonte única do padrão editorial.
 
 ### Hashtags
-- `short`: `#shorts` (opcional para classificação, ainda útil para busca) + 2–3 do nicho em pt-BR (ex.: `#podcast #cortes #empreendedorismo`). Máximo 3–4 no total; excesso dilui.
-- `corte`: 3–5 hashtags de nicho, sem `#shorts`.
+- Quantidades e posicionamento (no título e no bloco 4 da descrição): `references/padrao-copy.md` é a fonte única do padrão editorial.
 
 ## 6. Anti-padrões — NUNCA cortar
 

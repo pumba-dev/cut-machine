@@ -4,10 +4,32 @@
     {
       "platform": "youtube",
       "id": "principal",
-      "label": "Canal principal",
+      "label": "Missão no Nordeste",
+      "channel_name": "Missão no Nordeste",
+      "niche": "Cortes de política do partido Missão (fundado pelo MBL): o presidenciável Renan Santos e os porta-vozes do partido (Kim Kataguiri, Guto Zacarias, Amanda Vettorazzo). Direita liberal / terceira via, eleições 2026, conteúdo pt-BR.",
       "credentials_dir": "secrets/youtube/principal",
       "default": true,
-      "daily_upload_limit": 5
+      "daily_upload_limit": 5,
+      "default_hashtags": [
+        "#shorts",
+        "#viral",
+        "#brasil",
+        "#politica",
+        "#noticias",
+        "#cortes",
+        "#mbl",
+        "#eleicoes2026",
+        "#direita",
+        "#cortespodcast",
+        "#politicabrasileira",
+        "#nordeste",
+        "#renansantos",
+        "#partidomissao",
+        "#terceiravia",
+        "#cortesmbl",
+        "#novadireita",
+        "#oposicao"
+      ]
     }
   ]
 }

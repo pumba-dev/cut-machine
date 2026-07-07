@@ -1,4 +1,4 @@
-"""Baixa o video fonte de uma URL suportada para workspace/<video_id>/.
+"""Baixa o video fonte de uma URL suportada para video-output/<video_id>/.
 
 Uso: python scripts/download.py --url <URL>
 Idempotente: se o stage download ja esta done e source.mp4 existe, emite skipped.

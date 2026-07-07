@@ -1,4 +1,4 @@
-"""Estado do pipeline por video (workspace/<id>/state.json).
+"""Estado do pipeline por video (video-output/<id>/state.json).
 
 Fonte de verdade para retomada: toda etapa le o estado antes de rodar e
 nunca refaz etapa 'done'. Escrita atomica (tmp + os.replace) para que um

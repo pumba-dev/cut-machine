@@ -9,7 +9,7 @@ Executa a fase `publish` do pipeline. Uploads saem **sempre `private`** (politic
 
 ## Pre-condicoes
 
-1. Leia `workspace/<video_id>/state.json` e `clips.json`. Candidatos a upload: clips com `status: "rendered"` **e tambem** clips `status: "queued"` (ficaram aguardando quota em execucao anterior — reprocesse-os, priorizando por `score` decrescente).
+1. Leia `video-output/<video_id>/state.json` e `clips.json`. Candidatos a upload: clips com `status: "rendered"` **e tambem** clips `status: "queued"` (ficaram aguardando quota em execucao anterior — reprocesse-os, priorizando por `score` decrescente).
 2. Se nao ha candidatos, informe e sugira `/renderizar <video_id>` ou `/status <video_id>`.
 3. Resolva a conta: `--conta <id>` ou a conta `"default": true` em `config/accounts.json`. Confirme que `secrets/<plataforma>/<conta>/token.json` existe; se nao, oriente `python scripts/auth.py --platform youtube --account <id>`. Nunca leia o conteudo de arquivos em `secrets/`.
 
@@ -31,7 +31,7 @@ Sem confirmacao, nao publique nada.
 python scripts/upload_clip.py --video-id <video_id> --clip <clip_id> --account <conta>
 ```
 
-**Todos os candidatos**: spawne o subagente `publisher` via Task com workspace + conta. Ele itera os clips por score, roda `upload_clip.py` um a um e registra `publish.remote_id`, `publish.url`, `publish.published_at` e `status: "published"` em `clips.json`.
+**Todos os candidatos**: spawne o subagente `publisher` via Task com o caminho do video (`video-output/<video_id>`) + conta. Ele itera os clips por score, roda `upload_clip.py` um a um e registra `publish.remote_id`, `publish.url`, `publish.published_at` e `status: "published"` em `clips.json` (o `metadata.json` de cada clip em `video-output/<video_id>/<clip_id>/` e regenerado pelo proprio `upload_clip.py`).
 
 Contrato: ultima linha do stdout de cada script e JSON `{"ok": ...}`. Clip ja `published` nao e refeito (`{"ok": true, "skipped": true}`). Erro 403 `quotaExceeded`: pare os uploads imediatamente, marque/deixe os restantes como `queued` e reporte quantos sobraram — nao tente de novo hoje.
 

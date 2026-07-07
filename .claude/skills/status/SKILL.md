@@ -1,6 +1,6 @@
 ---
 name: status
-description: Mostra o estado consolidado do pipeline - etapa atual de cada video no workspace, clips por status e alertas (token OAuth perto de expirar, clips queued, erros pendentes). Somente leitura. Uso - /status [video_id]
+description: Mostra o estado consolidado do pipeline - etapa atual de cada video em video-output/, clips por status e alertas (token OAuth perto de expirar, clips queued, erros pendentes). Somente leitura. Uso - /status [video_id]
 ---
 
 # /status [video_id]
@@ -9,8 +9,8 @@ Skill **somente leitura**: nao rode scripts de pipeline, nao altere `state.json`
 
 ## 1. Coleta
 
-- Com `video_id`: leia apenas `workspace/<video_id>/state.json` e `clips.json`.
-- Sem argumento: liste os diretorios de `workspace/` e leia o `state.json` + `clips.json` de cada um (ignore diretorios sem `state.json`).
+- Com `video_id`: leia apenas `video-output/<video_id>/state.json` e `clips.json`.
+- Sem argumento: liste os diretorios de `video-output/` e leia o `state.json` + `clips.json` de cada um (ignore diretorios sem `state.json`).
 
 Etapa atual de um video = primeira etapa nao-`done` na ordem `download → transcribe → plan → copy → render → qa → publish` (se todas `done`: "concluido").
 
@@ -32,4 +32,4 @@ Verifique e liste ao final (apenas os que se aplicarem):
 
 ## 4. Encerramento
 
-Se o workspace esta vazio, diga que nao ha videos em andamento e aponte `/produzir <url>` para comecar.
+Se `video-output/` esta vazio, diga que nao ha videos em andamento e aponte `/produzir <url>` para comecar.

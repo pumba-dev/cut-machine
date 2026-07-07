@@ -1,4 +1,4 @@
-"""Contrato central do pipeline: clips.json (workspace/<id>/clips.json).
+"""Contrato central do pipeline: clips.json (video-output/<id>/clips.json).
 
 Donos por campo — ninguem sobrescreve campo de outro dono:
 - clip-scout (LLM): objeto do clip + campos de analise (start/end, hook_text, score...)
@@ -18,6 +18,16 @@ CLIP_STATUSES = (
     "planned", "approved", "rejected", "rendering", "rendered",
     "queued", "uploading", "published", "failed",
 )
+
+# Limites da API do YouTube + padrao editorial (references/padrao-copy.md).
+TITLE_MAX = 100          # limite duro da API
+TITLE_RECOMMENDED = 85   # acima disso: aviso (mobile trunca ~70)
+DESC_MAX_BYTES = 5000    # a API conta BYTES (UTF-8), nao chars
+TAGS_BUDGET = 500        # soma; tag com espaco conta +2 (aspas)
+MIN_TAGS, MAX_TAGS = 10, 15
+# Espelho do bloco 1 de references/padrao-copy.md — manter em sincronia.
+CTA_FIXA = ("🔥 Curtiu? Deixa o LIKE 👍, comenta o que achou 💬 "
+            "e se INSCREVE no canal pra não perder os próximos cortes!")
 
 FORMAT_RULES = {
     "short": {
@@ -77,6 +87,117 @@ def set_clip_status(clip: dict, status: str, error: str | None = None) -> dict:
     return clip
 
 
+def tags_budget_len(tags: list[str]) -> int:
+    """Custo das tags na API do YouTube: +2 por tag com espaco (aspas)."""
+    return sum(len(t) + (2 if " " in t else 0) for t in tags)
+
+
+def _description_hashtags(description: str | None) -> list[str]:
+    """Hashtags do ultimo bloco da description (bloco 4 do padrao-copy.md)."""
+    blocks = [b.strip() for b in (description or "").split("\n\n") if b.strip()]
+    if blocks:
+        tokens = blocks[-1].split()
+        if tokens and all(t.startswith("#") for t in tokens):
+            return tokens
+    return []
+
+
+def clip_metadata(plan: dict, clip: dict) -> dict:
+    """Metadados de postagem do clip, derivados de clips.json (fonte de verdade).
+
+    Gravado em video-output/<video_id>/<clip_id>/metadata.json ao lado do mp4,
+    para a publicacao manual (YouTube Studio etc.). Nunca editar a mao: e
+    regenerado no render e no upload.
+    """
+    tags = [t for t in (clip.get("tags") or []) if isinstance(t, str) and t.strip()]
+    src = plan.get("source", {})
+    return {
+        "clip_id": clip["id"],
+        "video_id": plan.get("video_id"),
+        "format": clip.get("format"),
+        "status": clip.get("status"),
+        "title": clip.get("title"),
+        "title_alts": clip.get("title_alts") or [],
+        "description": clip.get("description"),
+        "tags": tags,
+        "hashtags": _description_hashtags(clip.get("description"))
+        or ["#" + t.replace(" ", "").replace("-", "") for t in tags[:5]],
+        "hook_text": clip.get("hook_text"),
+        "score": clip.get("score"),
+        "start": clip.get("start"),
+        "end": clip.get("end"),
+        "duration_s": clip.get("duration_s"),
+        "source": {
+            "url": src.get("url"),
+            "title": src.get("title"),
+            "channel": src.get("channel"),
+        },
+        "render": clip.get("render") or {},
+        "publish": clip.get("publish") or {},
+    }
+
+
+def save_clip_metadata(path: Path, plan: dict, clip: dict) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(
+        json.dumps(clip_metadata(plan, clip), ensure_ascii=False, indent=1),
+        encoding="utf-8",
+    )
+    os.replace(tmp, path)
+
+
+def _copy_errors(cid: str, clip: dict) -> list[str]:
+    """Erros duros de copy: o que quebra a API ou copy incompleta.
+
+    Gate em title-not-null: plano recem-saido do clip-scout tem copy null.
+    Tolerante a tipo errado (o copywriter e um LLM escrevendo JSON):
+    reporta erro, nunca lanca.
+    """
+    title = clip.get("title")
+    if title is None:
+        return []
+    if not isinstance(title, str):
+        return [f"{cid}: title nao e string ({type(title).__name__})"]
+
+    errors: list[str] = []
+    if not title.strip():
+        errors.append(f"{cid}: title vazio")
+    if len(title) > TITLE_MAX:
+        errors.append(f"{cid}: title com {len(title)} chars (max {TITLE_MAX})")
+    if "<" in title or ">" in title:
+        errors.append(f"{cid}: title contem < ou > (API rejeita)")
+
+    desc = clip.get("description")
+    if desc is not None and not isinstance(desc, str):
+        errors.append(f"{cid}: description nao e string ({type(desc).__name__})")
+    else:
+        desc = desc or ""
+        if not desc.strip():
+            errors.append(f"{cid}: title preenchido mas description vazia")
+        elif len(desc.encode("utf-8")) > DESC_MAX_BYTES:
+            errors.append(
+                f"{cid}: description com {len(desc.encode('utf-8'))} bytes "
+                f"(max {DESC_MAX_BYTES})")
+        if "<" in desc or ">" in desc:
+            errors.append(f"{cid}: description contem < ou > (API rejeita)")
+
+    raw_tags = clip.get("tags")
+    if raw_tags is not None and not isinstance(raw_tags, list):
+        errors.append(f"{cid}: tags nao e lista ({type(raw_tags).__name__})")
+    else:
+        tags = [t for t in (raw_tags or [])
+                if isinstance(t, str) and t.strip()]
+        if not tags:
+            errors.append(f"{cid}: title preenchido mas tags vazias")
+        elif tags_budget_len(tags) > TAGS_BUDGET:
+            errors.append(
+                f"{cid}: tags somam {tags_budget_len(tags)} chars "
+                f"(max {TAGS_BUDGET}, +2 por tag com espaco)")
+    return errors
+
+
 def validate_plan(plan: dict) -> list[str]:
     """Retorna lista de erros (vazia = valido). Nao lanca excecao."""
     errors: list[str] = []
@@ -88,6 +209,10 @@ def validate_plan(plan: dict) -> list[str]:
         if cid in seen_ids:
             errors.append(f"{cid}: id duplicado")
         seen_ids.add(cid)
+
+        # Copy antes dos checks estruturais: erro de format/start-end nao pode
+        # esconder erro de copy do mesmo clip (o retry do copywriter e 1 so).
+        errors.extend(_copy_errors(cid, clip))
 
         fmt = clip.get("format")
         if fmt not in CLIP_FORMATS:
@@ -117,3 +242,73 @@ def validate_plan(plan: dict) -> list[str]:
             errors.append(f"{cid}: score fora de 0-100 ({score})")
 
     return errors
+
+
+def lint_copy(plan: dict) -> list[str]:
+    """Avisos de aderencia ao padrao editorial (references/padrao-copy.md).
+
+    Nao bloqueiam nada: o humano decide no checkpoint pos-copy. Clips sem
+    copy (title null) sao pulados.
+    """
+    warnings: list[str] = []
+    src_url = plan.get("source", {}).get("url") or ""
+
+    for clip in plan.get("clips", []):
+        cid = clip.get("id", "<sem id>")
+        title = clip.get("title")
+        if title is None or not isinstance(title, str):
+            continue  # sem copy, ou tipo errado (validate_plan ja reporta)
+
+        parts = title.split(" | ")
+        if len(parts) != 3:
+            warnings.append(
+                f"{cid}: title fora do padrao 'CATEGORIA | titulo | #hashtags'")
+        else:
+            categoria, _, hashtags_part = parts
+            if (not categoria or not categoria.isupper()
+                    or len(categoria) > 12 or " " in categoria):
+                warnings.append(
+                    f"{cid}: CATEGORIA '{categoria}' nao e 1 palavra "
+                    "MAIUSCULA de ate 12 chars")
+            htoks = hashtags_part.split()
+            if not (1 <= len(htoks) <= 2) or not all(t.startswith("#") for t in htoks):
+                warnings.append(f"{cid}: bloco final do title deve ter 1-2 hashtags")
+            if any(t.lower() == "#shorts" for t in htoks):
+                warnings.append(f"{cid}: #shorts no title (vai so na description)")
+        if len(title) > TITLE_RECOMMENDED:
+            warnings.append(
+                f"{cid}: title com {len(title)} chars (recomendado <= {TITLE_RECOMMENDED})")
+
+        desc = clip.get("description")
+        desc = desc if isinstance(desc, str) else ""
+        blocks = [b.strip() for b in desc.split("\n\n") if b.strip()]
+        if len(blocks) < 4:
+            warnings.append(f"{cid}: description com {len(blocks)} blocos (padrao: 4)")
+        if not blocks or blocks[0] != CTA_FIXA:
+            warnings.append(f"{cid}: bloco 1 da description nao e a CTA fixa")
+        if src_url and (len(blocks) < 2 or src_url not in blocks[1]):
+            warnings.append(
+                f"{cid}: bloco 2 da description sem o link do video original")
+
+        hs = [h.lower() for h in _description_hashtags(desc)]
+        fmt = clip.get("format")
+        if hs:
+            if fmt == "short" and "#shorts" not in hs:
+                warnings.append(f"{cid}: bloco de hashtags de short sem #shorts")
+            if fmt == "corte" and "#shorts" in hs:
+                warnings.append(f"{cid}: bloco de hashtags de corte com #shorts")
+            if not (3 <= len(hs) <= 5):
+                warnings.append(
+                    f"{cid}: {len(hs)} hashtags na description (padrao: 3-5)")
+        elif len(blocks) >= 4:
+            warnings.append(f"{cid}: ultimo bloco da description nao e so hashtags")
+
+        raw_tags = clip.get("tags")
+        tags = [t for t in (raw_tags or []) if isinstance(t, str) and t.strip()] \
+            if isinstance(raw_tags, list) else []
+        if len(tags) < MIN_TAGS:
+            warnings.append(f"{cid}: {len(tags)} tags (minimo {MIN_TAGS})")
+        elif len(tags) > MAX_TAGS:
+            warnings.append(f"{cid}: {len(tags)} tags (maximo recomendado {MAX_TAGS})")
+
+    return warnings

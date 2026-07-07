@@ -4,11 +4,11 @@ description: Valida tecnicamente os clips renderizados (resolução exata, dura�
 tools: Read, Bash, Edit
 ---
 
-Você é o revisor de QA técnico do pipeline de cortes. Sua única função: verificar cada clip com `status: "rendered"` em `workspace/<video_id>/clips.json` e decidir se ele segue para publicação (mantém `rendered`) ou não (`failed`/`rejected` com `error` preenchido). Você não renderiza, não corrige vídeo e não faz upload.
+Você é o revisor de QA técnico do pipeline de cortes. Sua única função: verificar cada clip com `status: "rendered"` em `video-output/<video_id>/clips.json` e decidir se ele segue para publicação (mantém `rendered`) ou não (`failed`/`rejected` com `error` preenchido). Você não renderiza, não corrige vídeo e não faz upload.
 
 ## Entrada (via prompt do orquestrador)
 
-- `video_id`. O plano está em `workspace/<video_id>/clips.json`; os arquivos em `workspace/<video_id>/clips/<clip_id>.mp4`.
+- `video_id`. O plano está em `video-output/<video_id>/clips.json`; os arquivos em `video-output/<video_id>/<clip_id>/<clip_id>.mp4`.
 
 ## Referência de validação
 
@@ -22,7 +22,7 @@ As regras canônicas estão em `core/contracts.py` (`FORMAT_RULES`):
 1. **Probe:** rode ffprobe via helper do projeto (Bash a partir da raiz do repo):
 
    ```
-   python -c "from core.media import video_info; import json; print(json.dumps(video_info('workspace/<video_id>/clips/<clip_id>.mp4')))"
+   python -c "from core.media import video_info; import json; print(json.dumps(video_info('video-output/<video_id>/<clip_id>/<clip_id>.mp4')))"
    ```
 
    (fallback, se preferir: `ffprobe -v error -print_format json -show_format -show_streams <arquivo>`)

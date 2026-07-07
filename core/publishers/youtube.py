@@ -22,6 +22,41 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def _sanitize_text(text: str) -> str:
+    """A API rejeita < e > em title/description."""
+    return text.replace("<", "").replace(">", "")
+
+
+def _truncate_bytes(text: str, limit: int) -> str:
+    """Corta em bytes UTF-8 (limite real da API) sem quebrar char no meio."""
+    return text.encode("utf-8")[:limit].decode("utf-8", errors="ignore")
+
+
+def _fit_tags(tags: list, budget: int = 500) -> list[str]:
+    """Dedupe (case-insensitive, preserva ordem) e corta para caber no orcamento
+    da API (~500 chars somados; tag com espaco conta +2 pelas aspas). Tags vem
+    do especifico ao generico, entao pular as do fim custa menos."""
+    if not isinstance(tags, (list, tuple)):
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    used = 0
+    for tag in tags:
+        if not isinstance(tag, str) or not tag.strip():
+            continue
+        tag = tag.strip()
+        key = tag.lower()
+        if key in seen:
+            continue
+        cost = len(tag) + (2 if " " in tag else 0)
+        if used + cost > budget:
+            continue
+        seen.add(key)
+        used += cost
+        result.append(tag)
+    return result
+
+
 def _is_quota_error(exc: Any) -> bool:
     """HttpError 403 com reason de quota (quotaExceeded e afins)."""
     status = getattr(getattr(exc, "resp", None), "status", None)
@@ -84,9 +119,10 @@ class YouTubePublisher(Publisher):
         language = metadata.get("language") or "pt-BR"
         body = {
             "snippet": {
-                "title": (metadata.get("title") or video_path.stem)[:100],
-                "description": (metadata.get("description") or "")[:5000],
-                "tags": metadata.get("tags") or [],
+                "title": _sanitize_text(metadata.get("title") or video_path.stem)[:100],
+                "description": _truncate_bytes(
+                    _sanitize_text(metadata.get("description") or ""), 5000),
+                "tags": _fit_tags(metadata.get("tags") or []),
                 "categoryId": str(metadata.get("category_id") or "22"),
                 "defaultLanguage": language,
                 "defaultAudioLanguage": language,

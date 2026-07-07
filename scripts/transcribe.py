@@ -1,4 +1,4 @@
-"""CLI: transcreve workspace/<video_id>/source.mp4 com faster-whisper."""
+"""CLI: transcreve video-output/<video_id>/source.mp4 com faster-whisper."""
 import argparse
 import sys
 from pathlib import Path

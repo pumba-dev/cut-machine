@@ -13,11 +13,11 @@ Só execute uploads se o prompt do orquestrador afirmar que o usuário aprovou e
 ## Entrada (via prompt do orquestrador)
 
 - `video_id`; opcionalmente lista de `clip_id` aprovados, plataforma e conta (`--platform`, `--account`).
-- Sem lista explícita: candidatos = clips com `status: "rendered"` em `workspace/<video_id>/clips.json` (clips `queued` de rodadas anteriores também contam, se o orquestrador mandar retomar a fila).
+- Sem lista explícita: candidatos = clips com `status: "rendered"` em `video-output/<video_id>/clips.json` (clips `queued` de rodadas anteriores também contam, se o orquestrador mandar retomar a fila).
 
 ## Processo
 
-1. Leia `workspace/<video_id>/clips.json` e monte a fila em ordem de `score` DECRESCENTE.
+1. Leia `video-output/<video_id>/clips.json` e monte a fila em ordem de `score` DECRESCENTE.
 2. Para cada clip da fila, rode (Bash, a partir da raiz do repo):
 
    ```
@@ -27,7 +27,7 @@ Só execute uploads se o prompt do orquestrador afirmar que o usuário aprovou e
    Acrescente `--platform <p>` / `--account <a>` apenas se o orquestrador informou.
 
 3. Interprete a ÚLTIMA linha do stdout, que é um JSON (`{"ok": true|false, ...}`):
-   - `ok: true` -> publicado. O próprio script grava `publish.remote_id`, `publish.url`, `publish.published_at` e o status em `clips.json`/`state.json` — NÃO edite esses campos. Anote a URL para o relatório.
+   - `ok: true` -> publicado. O próprio script grava `publish.remote_id`, `publish.url`, `publish.published_at` e o status em `clips.json`/`state.json`, e regenera `metadata.json` na pasta do clip (`video-output/<video_id>/<clip_id>/`) — NÃO edite esses campos nem o `metadata.json`. Anote a URL para o relatório.
    - `ok: true` com `skipped: true` -> já estava publicado; anote e siga.
    - `ok: true` com `queued: true` -> `daily_upload_limit` da conta atingido: o script marcou ESTE clip como `queued` sem subir nada. **PARE TUDO**: qualquer upload seguinte também seria enfileirado; os demais clips permanecem `rendered` e serão retomados em outro dia.
    - `ok: false` com `queued: true` (quota da YouTube Data API esgotada — mensagem contém `quota`) -> **PARE TUDO imediatamente**. O script marcou este clip como `queued`; os demais permanecem `rendered` e serão retomados em outro dia — não rode mais nenhum upload hoje.
