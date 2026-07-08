@@ -17,6 +17,10 @@ def main() -> None:
     parser.add_argument("--model", default="large-v3")
     parser.add_argument("--device", default="auto", choices=("auto", "cuda", "cpu"))
     parser.add_argument("--compute", default="int8")
+    parser.add_argument("--no-diarize", action="store_true",
+                        help="pula a diarizacao de falantes (legendas ficam em cor unica)")
+    parser.add_argument("--speakers", type=int, default=-1,
+                        help="numero de falantes, se conhecido (melhora o clustering)")
     args = parser.parse_args()
 
     st_path = state_path(args.video_id)
@@ -41,6 +45,7 @@ def main() -> None:
         summary = transcribe_video(
             video, args.video_id,
             model=args.model, device=args.device, compute=args.compute,
+            diarize=not args.no_diarize, num_speakers=args.speakers,
         )
     except Exception as exc:
         state.set_stage(st, "transcribe", "failed")
@@ -48,7 +53,8 @@ def main() -> None:
         state.save(st_path, st)
         fail(str(exc), video_id=args.video_id, stage="transcribe")
 
-    state.set_stage(st, "transcribe", "done", model=summary["model"], device=summary["device"])
+    state.set_stage(st, "transcribe", "done", model=summary["model"], device=summary["device"],
+                    speakers=summary.get("speakers", 0))
     state.save(st_path, st)
     emit(True, video_id=args.video_id, **summary)
 

@@ -1,6 +1,7 @@
 yt-dlp>=2025.6.9
 faster-whisper>=1.2.1
 ctranslate2>=4.8.1
+sherpa-onnx>=1.10.28
 nvidia-cublas-cu12>=12.4
 nvidia-cudnn-cu12>=9.1,<10
 google-api-python-client>=2.170.0

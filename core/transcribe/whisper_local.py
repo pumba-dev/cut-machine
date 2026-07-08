@@ -2,6 +2,8 @@
 
 GTX 1660 SUPER: sempre compute int8 (fp16 produz NaN na serie 16xx).
 Fallback automatico para CPU com modelo small quando CUDA nao esta disponivel.
+Apos o whisper roda diarizacao (core.diarize, sherpa-onnx CPU): palavras
+ganham `spk`, segmentos ganham `speaker` e o transcript ganha `speakers`.
 """
 import json
 import os
@@ -77,6 +79,8 @@ def transcribe_video(
     model: str = "large-v3",
     device: str = "auto",
     compute: str = "int8",
+    diarize: bool = True,
+    num_speakers: int = -1,
 ) -> dict:
     """Transcreve o video e grava os tres artefatos no workspace. Retorna resumo."""
     whisper, effective = load_model(model=model, device=device, compute=compute)
@@ -109,12 +113,25 @@ def transcribe_video(
             "words": words,
         })
 
+    # Diarizacao pos-whisper: grava spk por palavra e speaker por segmento.
+    # Falha aqui nao derruba a transcricao — legendas caem em cor unica.
+    speakers = 0
+    diarize_error = None
+    if diarize:
+        try:
+            from ..diarize import assign_speakers, diarize_turns
+            turns = diarize_turns(video_path, num_speakers=num_speakers)
+            speakers = assign_speakers(segments, turns)
+        except Exception as exc:  # noqa: BLE001 — degradacao intencional
+            diarize_error = str(exc)
+
     duration = round(float(info.duration), 3)
     transcript = {
         "video_id": video_id,
         "language": "pt",
         "model": effective["model"],
         "duration": duration,
+        "speakers": speakers,
         "segments": segments,
     }
     _write_json(transcript_path(video_id), transcript)
@@ -127,10 +144,14 @@ def transcribe_video(
 
     transcript_srt_path(video_id).write_text(_build_srt(segments), encoding="utf-8")
 
-    return {
+    summary = {
         "segments": len(segments),
         "words": total_words,
         "duration": duration,
         "device": effective["device"],
         "model": effective["model"],
+        "speakers": speakers,
     }
+    if diarize_error:
+        summary["diarize_error"] = diarize_error
+    return summary
