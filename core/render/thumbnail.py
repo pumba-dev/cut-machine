@@ -18,16 +18,18 @@ import subprocess
 from .. import paths
 from ..contracts import FORMAT_RULES
 
-# Cor de acento da miniatura (amarelo #FFD93D) em override inline ASS (&HBBGGRR&).
-_ACCENT_INLINE = "&H3DD9FF&"
-_WHITE_INLINE = "&HFFFFFF&"
+# Cores da miniatura em ASS (&HAABBGGRR, AA=00 opaco). Amarelo de marca #FFD93D.
+_ACCENT = "&H003DD9FF"   # amarelo
+_BLACK = "&H00000000"
+_WHITE = "&H00FFFFFF"
 
-# Tamanhos de fonte por formato (relativos ao PlayRes da miniatura).
+# Tamanhos/paddings por formato (relativos ao PlayRes da miniatura).
+# impact = frase amarela grande no topo; hook = chip de gancho na faixa inferior.
 _FONT_SIZES = {
-    "corte": {"impact": 76, "hook": 44, "outline": 5},
-    "short": {"impact": 120, "hook": 68, "outline": 7},
+    "corte": {"impact": 100, "hook": 44, "imp_out": 6, "chip_pad": 11},
+    "short": {"impact": 148, "hook": 60, "imp_out": 9, "chip_pad": 16},
 }
-_DEFAULT_SIZES = {"impact": 90, "hook": 52, "outline": 6}
+_DEFAULT_SIZES = {"impact": 118, "hook": 52, "imp_out": 7, "chip_pad": 13}
 
 
 def _t(value: float) -> str:
@@ -85,25 +87,51 @@ def _ass_escape(text: str) -> str:
 
 
 def build_thumb_ass(clip: dict, width: int, height: int) -> str:
-    """.ass da miniatura (PlayRes = resolucao da thumb). Um Dialogue com a
-    frase de impacto grande (acento) + ganchos menores (branco), Alignment 8
-    (topo-centro) para deixar a cena visivel embaixo."""
+    """.ass da miniatura (PlayRes = resolucao da thumb).
+
+    Layout (revisado 2026-07-08): frase de IMPACTO amarela GRANDE no topo
+    (Alignment 8, ocupa boa parte da largura, quebra em 2 linhas se longa) +
+    os ganchos como CHIPS distintos empilhados na FAIXA INFERIOR — cada gancho
+    em Dialogue proprio com BorderStyle=3 (caixa opaca), cores ALTERNANDO
+    preto/amarelo e folga vertical entre eles, para o usuario ler 3 frases
+    SEPARADAS e longe da frase principal (nao mais um bloco unico embaixo dela).
+    """
     fmt = clip.get("format")
-    sizes = _FONT_SIZES.get(fmt, _DEFAULT_SIZES)
+    s = _FONT_SIZES.get(fmt, _DEFAULT_SIZES)
     impact, hooks = _content(clip)
+    impact_fs, hook_fs = s["impact"], s["hook"]
+    imp_out, chip_pad = s["imp_out"], s["chip_pad"]
+    top_margin = round(height * 0.035)
 
-    imp_tag = f"{{\\fs{sizes['impact']}\\1c{_ACCENT_INLINE}\\b1}}"
-    text = imp_tag + _ass_escape(impact)
-    if hooks:
-        hook_tag = f"{{\\fs{sizes['hook']}\\1c{_WHITE_INLINE}}}"
-        text += "\\N" + hook_tag + "\\N".join(_ass_escape(h) for h in hooks)
-
-    margin_v = round(height * 0.06)
-    style = (
-        f"Style: Thumb,Arial Black,{sizes['hook']},&H00FFFFFF,&H0000FFFF,"
-        f"&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,{sizes['outline']},0,"
-        f"8,50,50,{margin_v},1"
+    # Impacto: topo-centro, contorno preto grosso (BorderStyle=1) + sombra leve.
+    impact_style = (
+        f"Style: Impact,Arial Black,{impact_fs},{_ACCENT},{_WHITE},{_BLACK},"
+        f"&H64000000,-1,0,0,0,100,100,0,0,1,{imp_out},{max(2, imp_out // 3)},"
+        f"8,40,40,{top_margin},1"
     )
+    # Ganchos: chip com caixa (BorderStyle=3); cor da caixa/texto vem inline.
+    hook_style = (
+        f"Style: Hook,Arial Black,{hook_fs},{_WHITE},{_WHITE},{_BLACK},"
+        f"&H00000000,-1,0,0,0,100,100,0,0,3,{chip_pad},0,5,40,40,40,1"
+    )
+
+    events = [
+        f"Dialogue: 0,0:00:00.00,0:00:10.00,Impact,,0,0,0,,{{\\b1}}{_ass_escape(impact)}"
+    ]
+    n = len(hooks)
+    if n:
+        cx = round(width / 2)
+        step = round(hook_fs * 2.2)
+        band_bottom = round(height * 0.92)
+        for i, h in enumerate(hooks):
+            y = band_bottom - (n - 1 - i) * step
+            box, txt = (_BLACK, _ACCENT) if i % 2 == 0 else (_ACCENT, _BLACK)
+            tag = (f"{{\\pos({cx},{y})\\an5\\1c{txt}\\3c{box}"
+                   f"\\bord{chip_pad}\\b1}}")
+            events.append(
+                f"Dialogue: 0,0:00:00.00,0:00:10.00,Hook,,0,0,0,,{tag}{_ass_escape(h)}"
+            )
+
     return (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -117,11 +145,12 @@ def build_thumb_ass(clip: dict, width: int, height: int) -> str:
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"{style}\n"
+        f"{impact_style}\n"
+        f"{hook_style}\n"
         "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-        f"Dialogue: 0,0:00:00.00,0:00:10.00,Thumb,,0,0,0,,{text}\n"
+        + "\n".join(events) + "\n"
     )
 
 

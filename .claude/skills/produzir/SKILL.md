@@ -77,8 +77,8 @@ Spawne o subagente `qa-reviewer` via Task com o workspace. Ele valida cada `<cli
 Pule esta secao se `--sem-upload` (informe que os clips estao renderizados e que `/publicar <video_id>` publica depois).
 
 1. Conte N = clips `rendered` aprovados no QA. Leia `daily_upload_limit` da conta em `config/accounts.json`.
-2. Apresente ao usuario: "Publicar N clips = N x 1600 unidades de quota (limite da API: 10.000/dia ~ 6 uploads; limite da conta: <daily_upload_limit>/dia). Clips acima do limite ficarao `queued` por score. Confirmar?"
-3. So apos confirmacao explicita, spawne o subagente `publisher` via Task com workspace + conta. Ele roda `scripts/upload_clip.py` clip a clip e registra `publish.remote_id/url/published_at`. Uploads saem sempre `private` (politica do projeto GCP nao-auditado).
+2. Apresente ao usuario: "Publicar N clips (limite de **uploads = 100/dia**, contador separado das 10k queries/dia; limite da conta: <daily_upload_limit>/dia). Clips acima do limite ficarao `queued` por score. Confirmar?"
+3. So apos confirmacao explicita, spawne o subagente `publisher` via Task com workspace + conta. Ele roda `scripts/upload_clip.py` clip a clip e registra `publish.remote_id/url/published_at`. Uploads saem `public` por padrao (revisado 2026-07-08; `private`/`unlisted` por clip para excecoes).
 
 ## 9. Relatorio final
 

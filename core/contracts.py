@@ -255,6 +255,29 @@ def validate_plan(plan: dict) -> list[str]:
     return errors
 
 
+def _title_problems(title: str, fmt: str) -> list[str]:
+    """Adere ao formato de titulo (references/padrao-copy.md):
+    '<TEXTO CAIXA ALTA> | #tag #tag #tag'. Retorna lista de problemas (vazia=ok)."""
+    if " | " not in title:
+        return ["sem ' | ' (formato: TEXTO | #tag #tag #tag)"]
+    text_part, tags_part = title.rsplit(" | ", 1)
+    toks = tags_part.split()
+    tags = [w for w in toks if w.startswith("#")]
+    low = [t.lower() for t in tags]
+    probs: list[str] = []
+    if text_part.upper() != text_part:
+        probs.append("texto nao esta em CAIXA ALTA")
+    if "#" in text_part:
+        probs.append("hashtag antes do ' | '")
+    if len(tags) != 3 or len(toks) != 3:
+        probs.append(f"precisa de exatamente 3 hashtags apos ' | ' (tem {len(tags)})")
+    if fmt == "short" and "#shorts" not in low:
+        probs.append("short sem #shorts no titulo")
+    if fmt == "corte" and "#shorts" in low:
+        probs.append("corte nao leva #shorts")
+    return probs
+
+
 def lint_copy(plan: dict) -> list[str]:
     """Avisos de aderencia ao padrao editorial (references/padrao-copy.md).
 
@@ -269,28 +292,23 @@ def lint_copy(plan: dict) -> list[str]:
         title = clip.get("title")
         if title is None or not isinstance(title, str):
             continue  # sem copy, ou tipo errado (validate_plan ja reporta)
+        fmt = clip.get("format")
 
-        # Titulo = gancho puro em CAIXA ALTA (revisado 2026-07-08): sem categoria,
-        # sem hashtags no titulo, sem template de pipes.
-        if title.upper() != title:
-            warnings.append(f"{cid}: title deve ser TODO em CAIXA ALTA")
-        if "#" in title:
-            warnings.append(f"{cid}: title nao deve ter hashtags (vao na description)")
-        if " | " in title:
-            warnings.append(f"{cid}: title nao usa mais o template com ' | ' (gancho puro)")
-        if len(title) > TITLE_RECOMMENDED:
-            warnings.append(
-                f"{cid}: title com {len(title)} chars (recomendado <= {TITLE_RECOMMENDED})")
+        # Titulo (revisado 2026-07-08 v2): "<TEXTO CAIXA ALTA> | #tag #tag #tag".
+        # Sem categoria; 3 hashtags (short: #shorts + 2; corte: 3) das
+        # default_hashtags da conta. Limite duro de 100 chars: validate_plan (erro).
+        for p in _title_problems(title, fmt):
+            warnings.append(f"{cid}: title {p}")
 
-        # Pool de variantes para teste A/B (title_alts).
+        # Pool de variantes para teste A/B (title_alts) - MESMO formato do title.
         alts = clip.get("title_alts")
         if isinstance(alts, list):
             clean = [a for a in alts if isinstance(a, str) and a.strip()]
             if len(clean) < 3:
                 warnings.append(
                     f"{cid}: title_alts com {len(clean)} variantes (pool A/B recomenda 6-10)")
-            if any(a.upper() != a or "#" in a or " | " in a for a in clean):
-                warnings.append(f"{cid}: alguma variante de title fora do padrao (CAIXA ALTA, sem # / pipes)")
+            if any(_title_problems(a, fmt) for a in clean):
+                warnings.append(f"{cid}: alguma variante fora do formato 'TEXTO | #tag #tag #tag'")
             pool = [t.lower() for t in [title] + clean]
             if len(set(pool)) != len(pool):
                 warnings.append(f"{cid}: variantes de title duplicadas (pool A/B deve ser distinto)")
@@ -362,4 +380,8 @@ def _thumbnail_warnings(cid: str, clip: dict) -> list[str]:
                 warnings.append(
                     f"{cid}: gancho de thumbnail '{h[:20]}...' com {len(h)} chars "
                     "(recomendado <= 30)")
+            if not (h.rstrip().endswith("!") or h.rstrip().endswith("?")):
+                warnings.append(
+                    f"{cid}: gancho '{h[:20]}...' sem ! nem ? "
+                    "(padrao: afirmacao com ! ou pergunta aberta com ?)")
     return warnings

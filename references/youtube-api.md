@@ -26,10 +26,11 @@ Conclusão: este projeto GCP aparenta estar auditado/liberado (ou a política mu
 
 Ressalvas: (1) a resposta do insert ecoa o status pedido — confirme na 1ª vez que o vídeo **permanece** público (abra a URL / Studio); a durabilidade de longo prazo não foi medida. (2) Publicar é ação externa/irreversível — confirmar com o usuário antes de subir em lote.
 
-### Quota: 10.000 unidades/dia
-- Cota padrão por projeto GCP: **10.000 unidades/dia**.
-- `videos.insert` custa **1.600 unidades** → **~6 uploads/dia** por projeto (`thumbnails.set` +50 cada).
-- No pipeline: cada conta tem `daily_upload_limit` em `config/accounts.json`. Clips aprovados além do limite diário ficam com status `queued`, ordenados por score, e sobem no dia seguinte.
+### Quota: DOIS contadores separados (revisado 2026-07-08)
+No console GCP (APIs & Services → YouTube Data API v3 → Quotas) há **duas métricas distintas**:
+- **Queries per day = 10.000 unidades/projeto** (leituras 1, `videos.insert` 1.600, `thumbnails.set` 50 — custo por chamada).
+- **Video uploads per day = 100/projeto** — contador SEPARADO, NÃO é derivado das 10k. Constatado no console em 2026-07-08: no mesmo dia o painel mostrava **2/100** uploads e ~100/10.000 queries usados (2 uploads NÃO consumiram 2×1.600 das queries). A premissa antiga de "~6 uploads/dia = 10k÷1600" estava errada para este projeto.
+- **Teto prático de upload = 100/dia.** `daily_upload_limit` por conta em `config/accounts.json` (setado **100**). Excedente fica `queued`, ordenado por score, sobe no dia seguinte. `quotaExceeded` real da API (se bater qualquer um dos dois) também re-enfileira sem gastar unidade.
 
 ### Aumentar a quota (auditoria + Quota Extension)
 
@@ -59,7 +60,7 @@ Não existe flag de Short na API: vídeo vertical/quadrado com ≤ 3 min vira Sh
 
 O YouTube bloqueia downloads sem sessão em muitos IPs residenciais. Constatado neste ambiente (2026-07): todos os `player_client` falham sem credencial, e `--cookies-from-browser` NÃO funciona com Chrome/Edge atuais no Windows (criptografia app-bound, yt-dlp issues #7271/#10927). Cookies exportados manualmente também se mostraram frágeis: uma sessão de teste (poucas dezenas de chamadas em minutos) foi suficiente para o YouTube invalidar o cookie e voltar `LOGIN_REQUIRED` mesmo com o cookie presente. Configuração atual, em camadas:
 
-1. **Runtime JS + solver EJS** (obrigatório, sempre ativo): `js_runtimes: {"node": {}}` + `remote_components: ["ejs:github"]` em `core/sources/youtube.py`. O yt-dlp moderno não entrega NENHUM formato sem resolver os desafios JS do YouTube; o solver é componente oficial do projeto yt-dlp, baixado do GitHub deles e cacheado localmente (autorizado pelo dono do repo).
+1. **Runtime JS + solver EJS** (obrigatório, sempre ativo): `js_runtimes` (Node) + `remote_components: ["ejs:github"]` em `core/sources/youtube.py`. O yt-dlp moderno não entrega NENHUM formato sem resolver os desafios JS do YouTube; o solver é componente oficial do projeto yt-dlp, baixado do GitHub deles e cacheado localmente (autorizado pelo dono do repo). **Node >= 20 é OBRIGATÓRIO** para o solver do desafio **nsig** (n challenge): com um Node EOL o solver falha (`WARNING: n challenge solving failed` → `Only images are available`) e o YouTube devolve **só storyboard, zero formato A/V — mesmo com cookie e PO token válidos**. Sintoma enganoso: `ERROR: Requested format is not available` em TODOS os vídeos (inclusive os que baixavam antes). Aqui o **nvm-for-windows** deixava o v12.22.12 (EOL) como ativo; `core/sources/youtube.py._node_ge20()` agora resolve automaticamente um Node ≥ 20 dentre as versões do nvm (`%APPDATA%\nvm\v*`) — ou defina `YTDLP_NODE` apontando pro node.exe. Constatado 2026-07-08.
 2. **Cookies exportados** (principal, detecção automática): extensão "Get cookies.txt LOCALLY" → salvar como `secrets/youtube-cookies.txt` (formato Netscape). Exportar em janela anônima e fechá-la sem deslogar. Sessão é frágil a uso em rajada — evitar rodar dezenas de extrações/testes seguidos contra o mesmo vídeo em poucos minutos; isso sozinho já foi suficiente para invalidar a sessão. Re-exportar quando `LOGIN_REQUIRED`/bot-check voltar.
 3. **Plugin PO token** (reserva, instalado e buildado): `bgutil-ytdlp-pot-provider` (pip) + repo em `C:\Users\eduar\bgutil-ytdlp-pot-provider`. Dois modos: HTTP server (`node build/main.js`, porta 4416, recomendado — script mode tem spawn lento e já beirou o timeout de 15s do yt-dlp) ou script mode (auto-detectado, sem daemon, mas mais lento/frágil). PO token não substitui cookies quando o YouTube já retorna `LOGIN_REQUIRED` — só ajuda a passar no bot-check quando a sessão está válida.
 

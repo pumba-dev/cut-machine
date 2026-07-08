@@ -42,7 +42,7 @@ Só execute uploads se o prompt do orquestrador afirmar que o usuário aprovou e
 
 ## Quota (YouTube Data API)
 
-Cada upload consome 1600 unidades de um limite diário de 10.000 (~6 uploads/dia por projeto). Contabilize: unidades consumidas = uploads bem-sucedidos nesta rodada x 1600.
+Dois contadores separados por projeto GCP (ver `references/youtube-api.md`): **Video uploads per day = 100** (o teto real de uploads) e **Queries per day = 10.000** (`videos.insert` 1.600, `thumbnails.set` 50 cada). O upload NÃO drena as 10k a 1600/un — são métricas distintas. Contabilize a rodada por **nº de uploads** contra o limite de 100/dia e o `daily_upload_limit` da conta.
 
 ## Resposta ao orquestrador (relatório final)
 

@@ -9,7 +9,7 @@
       "niche": "Cortes de política do partido Missão (fundado pelo MBL): o presidenciável Renan Santos e os porta-vozes do partido (Kim Kataguiri, Guto Zacarias, Amanda Vettorazzo). Direita liberal / terceira via, eleições 2026, conteúdo pt-BR.",
       "credentials_dir": "secrets/youtube/principal",
       "default": true,
-      "daily_upload_limit": 5,
+      "daily_upload_limit": 100,
       "brand": {
         "border_text": "Curta e se inscreva no canal",
         "border_color": "#000000",
@@ -18,24 +18,12 @@
         "short_bg_color": "#111111"
       },
       "default_hashtags": [
-        "#shorts",
-        "#viral",
-        "#brasil",
-        "#politica",
-        "#noticias",
-        "#cortes",
+        "#política",
         "#mbl",
         "#eleicoes2026",
         "#direita",
-        "#cortespodcast",
-        "#politicabrasileira",
-        "#nordeste",
         "#renansantos",
-        "#partidomissao",
-        "#terceiravia",
-        "#cortesmbl",
-        "#novadireita",
-        "#oposicao"
+        "#partidomissao"
       ]
     }
   ]

@@ -93,7 +93,7 @@ Cada clip (ordene por score decrescente):
             "output_path": "<clip_id>/<clip_id>.mp4",
             "rendered_at": null, "actual_duration_s": null},
  "publish": {"platform": "youtube", "account": "<conta informada ou principal>",
-             "privacy": "private", "category_id": "22", "made_for_kids": false,
+             "privacy": "public", "category_id": "22", "made_for_kids": false,
              "remote_id": null, "url": null, "published_at": null},
  "status": "planned",
  "error": null

@@ -17,7 +17,7 @@ Executa a fase `publish` do pipeline. Uploads saem **`public` por padrao** (test
 
 Antes de qualquer upload, apresente ao usuario e **aguarde confirmacao explicita**:
 
-- N clips a publicar = N x 1600 unidades (limite da API: 10.000/dia, ~6 uploads).
+- N clips a publicar contra o limite de **uploads = 100/dia** (contador separado das 10k queries/dia; o upload não drena as 10k a 1600/un — ver `references/youtube-api.md`).
 - `daily_upload_limit` da conta (em `config/accounts.json`): uploads alem desse limite hoje ficarao `queued` por score, para publicar amanha.
 - Lista dos clips: id | formato | score | titulo.
 

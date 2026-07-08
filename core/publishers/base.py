@@ -36,7 +36,7 @@ class Publisher(ABC):
         - description: str
         - tags: list[str]
         - category_id: str
-        - privacy: str ("private" por default)
+        - privacy: str ("public" por default)
         - made_for_kids: bool
         - language: str (ex.: "pt-BR")
         - thumbnail_path: str | None (opcional; miniatura para thumbnails.set
