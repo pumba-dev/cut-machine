@@ -18,7 +18,10 @@ NAO USAR: OAuth2 device-flow (yt-dlp-youtube-oauth2) - testado em 2026-07-06,
 falha com HTTP 400 no passo de device code; repositorio arquivado (jan/2026),
 bug aberto sem correcao desde nov/2024. Projeto morto, nao reativar.
 """
+import glob
+import os
 import re
+import subprocess
 from pathlib import Path
 
 from ..paths import ROOT
@@ -32,6 +35,41 @@ _URL_PATTERNS = (
     re.compile(r"(?:https?://)?youtu\.be/[\w-]{6,}", re.IGNORECASE),
 )
 
+# nvm-for-windows costuma deixar um Node EOL (ex.: v12) como ativo. O solver do
+# desafio nsig do yt-dlp (EJS/jsc) exige Node >= 20; com um node velho o YouTube
+# devolve so storyboard ("Only images available", zero formatos A/V) mesmo com
+# cookie e PO token validos. Resolve um Node >= 20 explicito (override em
+# YTDLP_NODE, senao varre as versoes do nvm em %APPDATA%\nvm) e passa via
+# js_runtimes; None => usa o node do PATH. Resultado cacheado no modulo.
+_NODE_GE20_CACHE: object = False  # False = ainda nao computado; depois str|None
+
+
+def _node_ge20() -> str | None:
+    global _NODE_GE20_CACHE
+    if _NODE_GE20_CACHE is not False:
+        return _NODE_GE20_CACHE  # type: ignore[return-value]
+    candidates: list[str] = []
+    env = os.environ.get("YTDLP_NODE")
+    if env:
+        candidates.append(env)
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates += sorted(
+            glob.glob(str(Path(appdata) / "nvm" / "v*" / "node.exe")), reverse=True)
+    found: str | None = None
+    for cand in candidates:
+        try:
+            out = subprocess.run([cand, "--version"], capture_output=True,
+                                 text=True, timeout=10)
+            major = int((out.stdout or "").strip().lstrip("v").split(".")[0])
+            if major >= 20:
+                found = cand
+                break
+        except Exception:
+            continue
+    _NODE_GE20_CACHE = found
+    return found
+
 
 class YouTubeSource(VideoSource):
     """Baixa videos do YouTube (watch, live, shorts, youtu.be)."""
@@ -43,14 +81,17 @@ class YouTubeSource(VideoSource):
         return any(p.search(url) for p in _URL_PATTERNS)
 
     def _base_opts(self) -> dict:
+        node = _node_ge20()
         opts = {
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
             "restrictfilenames": True,
-            # yt-dlp >= 2025.11 exige runtime JS para os desafios do YouTube;
-            # o default e deno, que nao existe nesta maquina - Node sim.
-            "js_runtimes": {"node": {}},
+            # yt-dlp >= 2025.11 exige runtime JS para os desafios do YouTube; o
+            # default e deno (ausente aqui) - usamos Node. IMPORTANTE: precisa
+            # ser Node >= 20 (ver _node_ge20); o node ativo do nvm pode ser EOL
+            # e derruba o solver nsig (YouTube devolve so storyboard).
+            "js_runtimes": {"node": {"path": node}} if node else {"node": {}},
             # Solver oficial de desafios do yt-dlp (baixado do GitHub deles,
             # cacheado local). Sem ele o YouTube nao entrega formato nenhum.
             # Autorizado pelo dono do repo em 2026-07-06.
