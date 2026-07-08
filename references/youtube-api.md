@@ -9,25 +9,45 @@ Como configurar credenciais e o que esperar do upload via YouTube Data API v3. P
 3. **OAuth consent screen**: User Type `External`, modo **Testing**. Adicionar a conta Google dona do canal em **Test users** (sem isso o login falha com `access_denied`).
 4. **Credentials → Create Credentials → OAuth client ID →** Application type **Desktop app** → baixar o JSON.
 5. Salvar o JSON como `secrets/youtube/<conta>/credentials.json` — o diretório exato vem de `credentials_dir` da conta em `config/accounts.json` (ex.: `secrets/youtube/principal/credentials.json`).
-6. Rodar `python scripts/auth.py --platform youtube --account <conta>`: abre o navegador (installed-app flow), pede consentimento e grava `secrets/youtube/<conta>/token.json`. Escopo mínimo usado: `https://www.googleapis.com/auth/youtube.upload`.
+6. Rodar `python scripts/auth.py --platform youtube --account <conta>`: abre o navegador (installed-app flow), pede consentimento e grava `secrets/youtube/<conta>/token.json`. Escopos: `youtube.upload` (subir vídeo + `thumbnails.set`) + `youtube.readonly` (reler status/estatísticas via `videos.list`). **Mudança de escopo exige re-consentimento**: apague `token.json` (ou deixe o refresh falhar) e re-rode `auth.py` para reautorizar com os dois escopos.
 
 `secrets/` inteiro é gitignored; `credentials.json` e `token.json` nunca entram em commit.
 
 ## LIMITAÇÕES CRÍTICAS (política vigente do YouTube)
 
-### Uploads via API ficam TRAVADOS como private
-Todo vídeo enviado por `videos.insert` a partir de projeto de API **não auditado** (qualquer projeto criado após 28/07/2020 — caso deste) fica **bloqueado como privado** ("locked private"), **sem apelação** — não dá para tornar público nem pelo YouTube Studio. Para publicação real só existem dois caminhos:
+### Privacidade do upload — REVISADO 2026-07-08: público funciona neste projeto
+A documentação original assumia que projeto de API não-auditado (criado após 28/07/2020) travaria todo `videos.insert` como **"locked private"**, sem apelação. **Isso NÃO se confirmou neste projeto.** Teste empírico em 2026-07-08 (`KGs0aTqKwaQ-c04`):
 
-- (a) passar pela auditoria de compliance da Google — formulário **"YouTube API Services – Audit and Quota Extension Form"**; ou
-- (b) subir o arquivo manualmente no YouTube Studio.
+- `videos.insert` com `status.privacyStatus="public"` → resposta `privacyStatus="public"`, `uploadStatus="uploaded"`, `rejectionReason=null`, `failureReason=null`.
+- `thumbnails.set` → **200 OK** (logo o canal está verificado por telefone, requisito da API para custom thumbnail).
+- Vídeo público: https://youtu.be/cBLLaNkxhwk
 
-Implicação na POC: `privacyStatus="private"` sempre (o bloco `publish` do clips.json já fixa `"privacy": "private"`). O upload via API valida o pipeline fim a fim; a publicação real é manual no Studio até a auditoria ser aprovada.
+Conclusão: este projeto GCP aparenta estar auditado/liberado (ou a política mudou). **Default do pipeline agora é `privacyStatus="public"`** (`upload_clip.py`/`youtube.py`); `privacy` por clip em `clips.json` pode ser `private`/`unlisted` para exceções.
+
+Ressalvas: (1) a resposta do insert ecoa o status pedido — confirme na 1ª vez que o vídeo **permanece** público (abra a URL / Studio); a durabilidade de longo prazo não foi medida. (2) Publicar é ação externa/irreversível — confirmar com o usuário antes de subir em lote.
 
 ### Quota: 10.000 unidades/dia
 - Cota padrão por projeto GCP: **10.000 unidades/dia**.
-- `videos.insert` custa **1.600 unidades** → **~6 uploads/dia** por projeto.
-- Aumento de quota passa pelo mesmo formulário de auditoria acima.
-- No pipeline: cada conta tem `daily_upload_limit` em `config/accounts.json` (hoje 5, margem sob o teto de 6). Clips aprovados além do limite diário ficam com status `queued`, ordenados por score, e sobem no dia seguinte.
+- `videos.insert` custa **1.600 unidades** → **~6 uploads/dia** por projeto (`thumbnails.set` +50 cada).
+- No pipeline: cada conta tem `daily_upload_limit` em `config/accounts.json`. Clips aprovados além do limite diário ficam com status `queued`, ordenados por score, e sobem no dia seguinte.
+
+### Aumentar a quota (auditoria + Quota Extension)
+
+**Importante:** a verificação de **"recursos avançados"** do canal (telefone → libera vídeo > 15 min, miniatura personalizada, live) **NÃO** aumenta a quota da API. Quota é do **projeto GCP**, não do canal. São coisas separadas.
+
+Três caminhos:
+
+**1. Auditoria + Quota Extension (oficial, gratuito, ~semanas).** O único jeito de subir a quota do mesmo projeto.
+- Pré-requisitos: (a) app do **OAuth consent screen publicado** (status *In production*, não *Testing* — isso também acaba com a expiração de 7 dias do token); (b) **Privacy Policy URL** + **Homepage URL** públicas e acessíveis; (c) app em conformidade com os *YouTube API Services Terms* + *Developer Policies* + *Branding Guidelines*.
+- Passos: Google Cloud Console → **APIs & Services → YouTube Data API v3 → Quotas & System Limits** → link *"apply for higher quota"* → abre o **"YouTube API Services – Audit and Quota Extension Form"** (Google Form).
+- O form pede: **project number** (Console → dashboard), descrição do caso de uso, quais métodos da API você chama e por quê, se/como exibe dados do YouTube na UI, screenshots ou vídeo demonstrando o fluxo, política de dados, e a **quota diária pedida + justificativa** (nº de canais, volume/dia).
+- Google revisa e pode pedir ajustes/rejeitar; aprovação concede a quota justificada.
+
+**2. Múltiplos projetos GCP (multiplicador imediato).** Cada projeto = +10k/dia próprios. 1 projeto por canal/conta. A arquitetura multi-conta já suporta: `config/accounts.json` com `credentials_dir` isolado por conta, cada uma apontando pro seu projeto. Google desencoraja fatiar só pra furar quota — usar quando há canais/finalidades realmente distintos.
+
+**3. Reduzir custo — não existe.** `videos.insert` fixo 1.600.
+
+**⚠️ Risco de compliance específico deste projeto:** os clips são **cortes de vídeos de terceiros** (canais originais). A auditoria (e o próprio YouTube) checa direitos sobre o conteúdo — repost de terceiros sem autorização/transformação suficiente pode reprovar a auditoria E gerar strike de copyright, independentemente da quota. Ter direito/parceria sobre a fonte, ou transformação clara (comentário/edição), reduz o risco.
 
 ### Token em modo Testing expira em 7 dias
 Com o OAuth consent screen em **Testing**, o refresh token **expira em 7 dias**. Sintoma típico: `invalid_grant` / `Token has been expired or revoked` no upload. Correção: re-rodar `python scripts/auth.py --platform youtube --account <conta>` e consentir de novo no navegador. Publicar o app (verificação da Google) elimina a expiração, mas não vale o custo na POC.

@@ -90,14 +90,17 @@ def main() -> None:
     state.set_stage(st, "publish", "running")
     state.save(st_path, st)
 
+    thumb_rel = (clip.get("render") or {}).get("thumbnail_path")
     metadata = {
         "title": clip.get("title") or "",
         "description": clip.get("description") or "",
         "tags": clip.get("tags") or [],
         "category_id": publish.get("category_id") or "22",
-        "privacy": publish.get("privacy") or "private",
+        "privacy": publish.get("privacy") or "public",
         "made_for_kids": bool(publish.get("made_for_kids", False)),
         "language": plan.get("source", {}).get("language") or "pt-BR",
+        # miniatura best-effort (thumbnails.set); ausencia nao impede o upload
+        "thumbnail_path": str(paths.ROOT / thumb_rel) if thumb_rel else None,
     }
 
     try:

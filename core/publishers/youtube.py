@@ -13,7 +13,12 @@ from typing import Any
 from ..accounts import credentials_dir
 from .base import Publisher, QuotaExceededError
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    # readonly permite reler status/estatisticas do proprio video (videos.list);
+    # sem ele, videos.list retorna 403 insufficientPermissions.
+    "https://www.googleapis.com/auth/youtube.readonly",
+]
 CHUNK_SIZE = 8 * 1024 * 1024
 QUOTA_REASONS = {"quotaExceeded", "dailyLimitExceeded", "uploadLimitExceeded"}
 
@@ -128,7 +133,9 @@ class YouTubePublisher(Publisher):
                 "defaultAudioLanguage": language,
             },
             "status": {
-                "privacyStatus": metadata.get("privacy") or "private",
+                # projeto auditado/liberado: default public (upload de teste
+                # confirmou public + thumbnails.set). Private por clip via metadata.
+                "privacyStatus": metadata.get("privacy") or "public",
                 # madeForKids e derivado pelo YouTube; declaracao vai no self*.
                 "selfDeclaredMadeForKids": bool(metadata.get("made_for_kids", False)),
             },
@@ -154,8 +161,40 @@ class YouTubePublisher(Publisher):
             raise
 
         remote_id = response["id"]
-        return {
+        result = {
             "remote_id": remote_id,
             "url": f"https://youtu.be/{remote_id}",
             "published_at": _now_iso(),
         }
+        thumb = metadata.get("thumbnail_path")
+        if thumb:
+            result["thumbnail_set"] = _set_thumbnail(youtube, remote_id, Path(thumb))
+        return result
+
+
+def _set_thumbnail(youtube: Any, remote_id: str, thumb_path: Path) -> bool:
+    """thumbnails.set best-effort (custa 50 unidades). Nunca lanca: canal nao
+    verificado (403), quota, arquivo ausente etc. viram aviso no stderr. O
+    upload ja esta 'published' independentemente disso."""
+    from googleapiclient.errors import HttpError
+    from googleapiclient.http import MediaFileUpload
+
+    if not thumb_path.exists():
+        print(f"thumbnail: arquivo nao encontrado ({thumb_path}); pulando",
+              file=sys.stderr)
+        return False
+    mime = "image/png" if thumb_path.suffix.lower() == ".png" else "image/jpeg"
+    try:
+        youtube.thumbnails().set(
+            videoId=remote_id,
+            media_body=MediaFileUpload(str(thumb_path), mimetype=mime),
+        ).execute()
+        return True
+    except HttpError as exc:
+        reason = "canal nao verificado / quota / video bloqueado"
+        print(f"thumbnail: thumbnails.set falhou ({reason}): {exc}; "
+              "suba a miniatura manualmente no YouTube Studio", file=sys.stderr)
+        return False
+    except Exception as exc:  # rede, credencial, etc. — best-effort
+        print(f"thumbnail: thumbnails.set erro inesperado: {exc}", file=sys.stderr)
+        return False

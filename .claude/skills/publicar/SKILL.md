@@ -5,7 +5,7 @@ description: Publica no YouTube os clips renderizados de um video, com checkpoin
 
 # /publicar <video_id> [clip_id] [--conta <id>]
 
-Executa a fase `publish` do pipeline. Uploads saem **sempre `private`** (politica: projeto GCP nao-auditado trava uploads como private).
+Executa a fase `publish` do pipeline. Uploads saem **`public` por padrao** (teste 2026-07-08 confirmou que este projeto aceita publico + `thumbnails.set`; ver `references/youtube-api.md`). `privacy` por clip em `clips.json` pode ser `private`/`unlisted` para excecoes. Publicar e irreversivel/externo: confirme antes de subir em lote.
 
 ## Pre-condicoes
 
@@ -37,7 +37,7 @@ Contrato: ultima linha do stdout de cada script e JSON `{"ok": ...}`. Clip ja `p
 
 ## 3. Relatorio final
 
-- Publicados: id | titulo | URL (avisando que estao **private** — tornar publicos e decisao manual do usuario no YouTube Studio).
+- Publicados: id | titulo | URL | privacidade retornada pela API. Na 1a publicacao, confirme que o video permanece **public** (abra a URL).
 - `queued` aguardando quota (re-rodar `/publicar <video_id>` amanha).
 - Falhas com motivo (`clips.json.clips[].error`, `state.json.last_error`).
 - Quota consumida estimada (uploads x 1600).

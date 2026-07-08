@@ -5,6 +5,8 @@
   "permissions": {
     "allow": [
       "Bash(python scripts/*)",
+      "Bash(python scripts/upload_clip.py:*)",
+      "Bash(python scripts/publish_next.py:*)",
       "Bash(python -m compileall*)",
       "Bash(python -m yt_dlp*)",
       "Bash(ffmpeg *)",

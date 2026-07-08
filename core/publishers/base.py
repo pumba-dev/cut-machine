@@ -39,6 +39,8 @@ class Publisher(ABC):
         - privacy: str ("private" por default)
         - made_for_kids: bool
         - language: str (ex.: "pt-BR")
+        - thumbnail_path: str | None (opcional; miniatura para thumbnails.set
+          best-effort — falha nao derruba o upload)
 
         Lanca QuotaExceededError quando a quota diaria da API esgotar.
         """
