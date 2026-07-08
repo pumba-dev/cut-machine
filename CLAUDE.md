@@ -15,6 +15,8 @@ download -> transcribe -> plan -> copy -> render -> qa -> publish
 
 - Estado **por fase**: `video-output/<video_id>/state.json` (`core.state`, status `pending|running|partial|done|failed`).
 - Estado **por clip**: `clips.json.clips[].status` (`planned -> approved -> rendering -> rendered -> queued -> uploading -> published`; desvios `rejected`/`failed` com `error` obrigatório).
+- **Trava de QA no auto-publish**: `publish_next.py` (Task do Windows) só publica clip com `qa.status == "pass"` (bloco carimbado pelo qa-reviewer, dono do campo `qa`). Clip `rendered` sem QA fica retido na fila — fecha o race render→QA→publish (a Task não pegava um render antes do QA validar). Retrofit/rede de segurança determinística: `python scripts/qa_backfill.py` (mesmos checks via ffprobe, carimba em massa).
+- **Limpeza de disco pós-publish** (`core/cleanup.py`): quando um vídeo fica **completo** — ≥1 clip `published` E nenhum clip pendente (todos `published`/`failed`/`rejected`) — a pasta `video-output/<video_id>/` é apagada para liberar disco (mp4/source/thumbs = os GB). Antes de apagar, o `clips.json` é arquivado em `video-output/_archive/<video_id>.clips.json` (preserva URLs/IDs publicados). Um clip `failed`/`rejected` **não** trava a limpeza; um vídeo sem nenhum `published` **nunca** é apagado. Roda automático no fim do `publish_next.py` (best-effort — nunca derruba o publish). Retrofit do backlog / limpeza manual: `python scripts/cleanup_published.py [--video-id <id>] [--dry-run]`.
 
 **REGRA DE OURO**: antes de QUALQUER etapa, leia `state.json`. Nunca refaça etapa `done`.
 `partial` retoma pelo delta (só clips não concluídos, via `clips.json`). `running` órfão
@@ -38,7 +40,7 @@ download -> transcribe -> plan -> copy -> render -> qa -> publish
 - `video_id` = id nativo da fonte (ex.: id do YouTube). `clip_id` = `<video_id>-s01` (short) / `<video_id>-c01` (corte).
 - Timestamps sempre em **segundos float** (`1234.56`), alinhados a fronteiras de palavras do `transcript.json`.
 - **Contrato de script**: todo CLI em `scripts/` é idempotente (emite `{"ok": true, "skipped": true}` se já feito), imprime **UMA linha JSON como último output** no stdout (`core.cli.emit`), atualiza `state.json` sozinho, I/O sempre UTF-8. Você lê só essa última linha.
-- `clips.json` é o **único contrato** entre subagentes e scripts — nenhum dado de clip vive fora dele. Dono por campo (ver `core/contracts.py`): clip-scout cria o clip + análise; copywriter preenche copy; `render_clip.py` preenche `render.*`; `upload_clip.py` preenche `publish.*`; humano/você transiciona `approved/rejected`. **Ninguém sobrescreve campo de outro dono.**
+- `clips.json` é o **único contrato** entre subagentes e scripts — nenhum dado de clip vive fora dele. Dono por campo (ver `core/contracts.py`): clip-scout cria o clip + análise; copywriter preenche copy; `render_clip.py` preenche `render.*`; **qa-reviewer preenche `qa.*`** (`qa.status` pass/fail); `upload_clip.py` preenche `publish.*`; humano/você transiciona `approved/rejected`. **Ninguém sobrescreve campo de outro dono.**
 - Cada clip tem subpasta própria `video-output/<video_id>/<clip_id>/` com `<clip_id>.mp4`, `<clip_id>.ass` (só shorts), `<clip_id>.border.ass` (só cortes **sem arte PNG** — fallback da moldura gerada), `<clip_id>.thumb.jpg` (miniatura, ambos os formatos) e `metadata.json` — este último é **derivado** de `clips.json` (gerado por `render_clip.py`, regenerado por `upload_clip.py` após publish). Ninguém edita `metadata.json` à mão; subagentes LLM não escrevem nele.
 - Formatos (`core.contracts.FORMAT_RULES`): `short` 15–59s, 1080x1920, sem crop (vídeo numa janela com a arte PNG da conta **por cima** — janela transparente; `core/render/short_frame.py`; substituiu o fundo blur), legendas queimadas; `corte` 480–900s (8–15 min, ≥8 min para monetização), 1920x1080, sem burn (vídeo numa janela com a arte PNG por cima — `core/render/corte_frame.py`; fallback sem PNG: moldura gerada preto+amarelo de `branding.py`). **Compositing:** canvas preto → vídeo na janela → arte PNG por cima → (short) legendas queimadas por último. Toda a marca/CTA vem embutida no PNG.
 
@@ -51,6 +53,7 @@ python scripts/diarize.py     --video-id <id> [--speakers N] [--force]
 python scripts/render_clip.py --video-id <id> [--clip <clip_id>] [--all-approved]
 python scripts/upload_clip.py --video-id <id> --clip <clip_id> [--platform youtube] [--account <account_id>]
 python scripts/auth.py        --platform youtube [--account <account_id>]
+python scripts/cleanup_published.py [--video-id <id>] [--dry-run]
 ```
 
 Render é **sequencial** por clip (GPU 6GB não comporta paralelismo folgado).
@@ -62,7 +65,7 @@ Render é **sequencial** por clip (GPU 6GB não comporta paralelismo folgado).
 |---|---|---|
 | `clip-scout` | após `transcribe` done | lê `transcript.compact.json` + `references/heuristicas-virais.md`; escreve clips `planned` em `clips.json` (start/end, hook, score, rationale, `thumbnail_ts`) |
 | `copywriter` | após `plan` done | preenche `title`, `title_alts`, `description`, `tags`, `thumbnail_text` dos clips `planned` |
-| `qa-reviewer` | após `render` | ffprobe em cada mp4 (resolução, duração ±0.5s, áudio); mantém `rendered` ou marca `failed` |
+| `qa-reviewer` | após `render` | ffprobe em cada mp4 (resolução, duração ±0.5s, áudio); aprova → carimba `qa.status: "pass"` (mantém `rendered`, libera auto-publish) ou marca `failed`/`rejected` + `qa.status: "fail"` |
 | `publisher` | só após aprovação explícita do usuário | roda `upload_clip.py` por clip, valida retorno, registra `publish.*`; em `quotaExceeded` para tudo e reporta |
 
 Passe sempre no prompt do subagente: `video_id`, caminho da pasta do vídeo (`video-output/<video_id>`) e o que se espera de volta (resumo curto, não o JSON inteiro).

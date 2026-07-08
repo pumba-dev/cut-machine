@@ -4,6 +4,7 @@ Donos por campo — ninguem sobrescreve campo de outro dono:
 - clip-scout (LLM): objeto do clip + campos de analise (start/end, hook_text, score...)
 - copywriter (LLM): title, title_alts, description, tags
 - render_clip.py: bloco render.*
+- qa-reviewer: bloco qa.* (qa.status pass/fail) + transicao failed/rejected
 - upload_clip.py: bloco publish.* (remote_id, url, published_at)
 - humano/orquestrador: transicao approved/rejected
 """
@@ -93,6 +94,26 @@ def set_clip_status(clip: dict, status: str, error: str | None = None) -> dict:
         raise ValueError("status failed exige mensagem em error")
     clip["status"] = status
     clip["error"] = error
+    return clip
+
+
+def qa_passed(clip: dict) -> bool:
+    """True se o QA tecnico aprovou o clip.
+
+    Trava do auto-publish: publish_next so publica clip com qa.status == 'pass'.
+    Fecha o race render->QA->publish em que a Task do Windows pegaria um clip
+    'rendered' antes do QA rodar (e antes de um render quebrado virar 'failed').
+    """
+    qa = clip.get("qa")
+    return isinstance(qa, dict) and qa.get("status") == "pass"
+
+
+def set_clip_qa(clip: dict, status: str, note: str | None = None) -> dict:
+    """Dono: qa-reviewer. 'pass' libera o clip para publicacao; 'fail' registra
+    a reprovacao tecnica (o clip tambem transiciona failed/rejected a parte)."""
+    if status not in ("pass", "fail"):
+        raise ValueError(f"qa status invalido: {status}")
+    clip["qa"] = {"status": status, "note": note}
     return clip
 
 

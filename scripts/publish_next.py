@@ -9,6 +9,16 @@ Idempotente e seguro para sobre-disparo: se a quota/limite diario estourou,
 upload_clip.py apenas re-enfileira (nao gasta unidade) e este script reporta
 {"skipped": true, "reason": "queued"}; o mesmo clip sera tentado na proxima vez.
 
+Trava de QA: so publica clip que ja passou pelo qa-reviewer (qa.status ==
+'pass'). Clip 'rendered' sem QA fica na fila ate o QA rodar — fecha o race em
+que a Task pegaria um render ainda nao validado. Se ha pendentes mas nenhum
+com QA, reporta reason='aguardando QA'.
+
+Limpeza de disco: apos publicar com sucesso, se aquele video ficou completo
+(>=1 published e nenhum clip pendente), a pasta dele e apagada — o clips.json
+e arquivado antes (core.cleanup). Best-effort: nunca derruba o resultado do
+publish.
+
 Uso: python scripts/publish_next.py --format short|corte [--account <id>]
 """
 import argparse
@@ -19,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import contracts, paths
+from core import cleanup, contracts, paths
 from core.cli import emit
 
 # status de clip prontos para upload (ainda nao publicados)
@@ -63,12 +73,17 @@ def main() -> None:
                        if d.is_dir() and (d / "clips.json").exists())
 
     order = _interleaved(video_ids, args.format)
-    nxt = next(((v, c) for v, c in order if c.get("status") in PENDING), None)
+    pending = [(v, c) for v, c in order if c.get("status") in PENDING]
+    # trava de QA: so publica clip aprovado pelo qa-reviewer (qa.status == 'pass')
+    nxt = next(((v, c) for v, c in pending if contracts.qa_passed(c)), None)
     if nxt is None:
         total = len(order)
         done = sum(1 for _, c in order if c.get("status") == "published")
-        emit(True, skipped=True, reason="fila concluida", format=args.format,
-             total=total, published=done)
+        awaiting_qa = sum(1 for _, c in pending if not contracts.qa_passed(c))
+        emit(True, skipped=True,
+             reason="aguardando QA" if awaiting_qa else "fila concluida",
+             format=args.format, total=total, published=done,
+             awaiting_qa=awaiting_qa)
         return
 
     vid, clip = nxt
@@ -94,6 +109,15 @@ def main() -> None:
     except json.JSONDecodeError:
         result = {"ok": False, "error": "saida do upload_clip nao e JSON", "raw": last[:300]}
     result["picked"] = {"video_id": vid, "clip_id": clip["id"], "format": args.format}
+    # limpeza de disco: se este video ficou completo, apaga a pasta (arquiva
+    # o clips.json antes). Best-effort — nunca invalida um publish bem-sucedido.
+    if result.get("ok"):
+        try:
+            cleaned = cleanup.cleanup_if_complete(vid)
+            if cleaned:
+                result["cleanup"] = cleaned
+        except Exception as e:  # noqa: BLE001 — limpeza nao pode derrubar o publish
+            result["cleanup_error"] = str(e)
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0 if result.get("ok") else 1)
 
