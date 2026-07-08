@@ -21,7 +21,7 @@ CLIP_STATUSES = (
 
 # Limites da API do YouTube + padrao editorial (references/padrao-copy.md).
 TITLE_MAX = 100          # limite duro da API
-TITLE_RECOMMENDED = 85   # acima disso: aviso (mobile trunca ~70)
+TITLE_RECOMMENDED = 70   # acima disso: aviso (mobile trunca ~70); titulo = gancho caps
 DESC_MAX_BYTES = 5000    # a API conta BYTES (UTF-8), nao chars
 TAGS_BUDGET = 500        # soma; tag com espaco conta +2 (aspas)
 MIN_TAGS, MAX_TAGS = 10, 15
@@ -34,15 +34,24 @@ FORMAT_RULES = {
         "min_duration_s": 15.0,
         "max_duration_s": 59.0,
         "resolution": "1080x1920",
-        "crop": "center",
+        # sem crop: video original centralizado sobre fundo blur (ffmpeg.py)
+        "crop": "blur",
         "burn_captions": True,
+        "border": False,
+        # miniatura vertical (frame do clip + frases sobrepostas)
+        "thumbnail_resolution": "1080x1920",
     },
     "corte": {
-        "min_duration_s": 120.0,
-        "max_duration_s": 600.0,
+        # >=8 min habilita mid-roll ads / monetizacao no YouTube; alvo 8-15 min.
+        "min_duration_s": 480.0,
+        "max_duration_s": 900.0,
         "resolution": "1920x1080",
         "crop": "none",
         "burn_captions": False,
+        # moldura de marca preto+amarelo com CTA de inscricao (branding.py)
+        "border": True,
+        # miniatura 16:9 (tamanho recomendado do YouTube)
+        "thumbnail_resolution": "1280x720",
     },
 }
 
@@ -123,6 +132,8 @@ def clip_metadata(plan: dict, clip: dict) -> dict:
         "hashtags": _description_hashtags(clip.get("description"))
         or ["#" + t.replace(" ", "").replace("-", "") for t in tags[:5]],
         "hook_text": clip.get("hook_text"),
+        "thumbnail_ts": clip.get("thumbnail_ts"),
+        "thumbnail_text": clip.get("thumbnail_text") or {},
         "score": clip.get("score"),
         "start": clip.get("start"),
         "end": clip.get("end"),
@@ -259,25 +270,30 @@ def lint_copy(plan: dict) -> list[str]:
         if title is None or not isinstance(title, str):
             continue  # sem copy, ou tipo errado (validate_plan ja reporta)
 
-        parts = title.split(" | ")
-        if len(parts) != 3:
-            warnings.append(
-                f"{cid}: title fora do padrao 'CATEGORIA | titulo | #hashtags'")
-        else:
-            categoria, _, hashtags_part = parts
-            if (not categoria or not categoria.isupper()
-                    or len(categoria) > 12 or " " in categoria):
-                warnings.append(
-                    f"{cid}: CATEGORIA '{categoria}' nao e 1 palavra "
-                    "MAIUSCULA de ate 12 chars")
-            htoks = hashtags_part.split()
-            if not (1 <= len(htoks) <= 2) or not all(t.startswith("#") for t in htoks):
-                warnings.append(f"{cid}: bloco final do title deve ter 1-2 hashtags")
-            if any(t.lower() == "#shorts" for t in htoks):
-                warnings.append(f"{cid}: #shorts no title (vai so na description)")
+        # Titulo = gancho puro em CAIXA ALTA (revisado 2026-07-08): sem categoria,
+        # sem hashtags no titulo, sem template de pipes.
+        if title.upper() != title:
+            warnings.append(f"{cid}: title deve ser TODO em CAIXA ALTA")
+        if "#" in title:
+            warnings.append(f"{cid}: title nao deve ter hashtags (vao na description)")
+        if " | " in title:
+            warnings.append(f"{cid}: title nao usa mais o template com ' | ' (gancho puro)")
         if len(title) > TITLE_RECOMMENDED:
             warnings.append(
                 f"{cid}: title com {len(title)} chars (recomendado <= {TITLE_RECOMMENDED})")
+
+        # Pool de variantes para teste A/B (title_alts).
+        alts = clip.get("title_alts")
+        if isinstance(alts, list):
+            clean = [a for a in alts if isinstance(a, str) and a.strip()]
+            if len(clean) < 3:
+                warnings.append(
+                    f"{cid}: title_alts com {len(clean)} variantes (pool A/B recomenda 6-10)")
+            if any(a.upper() != a or "#" in a or " | " in a for a in clean):
+                warnings.append(f"{cid}: alguma variante de title fora do padrao (CAIXA ALTA, sem # / pipes)")
+            pool = [t.lower() for t in [title] + clean]
+            if len(set(pool)) != len(pool):
+                warnings.append(f"{cid}: variantes de title duplicadas (pool A/B deve ser distinto)")
 
         desc = clip.get("description")
         desc = desc if isinstance(desc, str) else ""
@@ -311,4 +327,39 @@ def lint_copy(plan: dict) -> list[str]:
         elif len(tags) > MAX_TAGS:
             warnings.append(f"{cid}: {len(tags)} tags (maximo recomendado {MAX_TAGS})")
 
+        warnings.extend(_thumbnail_warnings(cid, clip))
+
+    return warnings
+
+
+def _thumbnail_warnings(cid: str, clip: dict) -> list[str]:
+    """Avisos leves de thumbnail_text (copywriter). Nao bloqueiam: a geracao
+    da miniatura tem fallback para hook_text/title quando falta."""
+    warnings: list[str] = []
+    tt = clip.get("thumbnail_text")
+    if tt is None:
+        warnings.append(f"{cid}: sem thumbnail_text (miniatura usara fallback)")
+        return warnings
+    if not isinstance(tt, dict):
+        warnings.append(f"{cid}: thumbnail_text nao e objeto ({type(tt).__name__})")
+        return warnings
+    impact = tt.get("impact")
+    if not isinstance(impact, str) or not impact.strip():
+        warnings.append(f"{cid}: thumbnail_text.impact vazio")
+    elif len(impact) > 40:
+        warnings.append(
+            f"{cid}: thumbnail_text.impact com {len(impact)} chars (recomendado <= 40)")
+    hooks = tt.get("hooks")
+    if not isinstance(hooks, list):
+        warnings.append(f"{cid}: thumbnail_text.hooks nao e lista")
+    else:
+        clean = [h for h in hooks if isinstance(h, str) and h.strip()]
+        if not (2 <= len(clean) <= 3):
+            warnings.append(
+                f"{cid}: {len(clean)} frases de gancho na thumbnail (padrao 2-3)")
+        for h in clean:
+            if len(h) > 30:
+                warnings.append(
+                    f"{cid}: gancho de thumbnail '{h[:20]}...' com {len(h)} chars "
+                    "(recomendado <= 30)")
     return warnings

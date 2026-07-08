@@ -7,34 +7,56 @@ quantidade/formato daqui têm espelho verificado em código (`core/contracts.py`
 
 ## Título
 
-Template obrigatório (os separadores são ` | ` — espaço, pipe, espaço):
+**O título é o gancho puro, TODO EM CAIXA ALTA.** Sem prefixo de categoria, sem
+template de pipes, sem hashtags no título (revisado em 2026-07-08 — a categoria e
+o formato `CATEGORIA | ... | #tags` atrapalhavam o gancho).
 
 ```
-CATEGORIA | <título do clip> | #hashtag1 #hashtag2
+GANCHO CURTO E FORTE EM CAIXA ALTA
 ```
 
-- `CATEGORIA`: **uma** palavra-tema em MAIÚSCULAS, escolhida por vídeo conforme o
-  conteúdo dominante — a MESMA para todos os clips do mesmo vídeo. Exemplos:
-  POLÍTICA, ECONOMIA, ELEIÇÕES, NEGÓCIOS, TECNOLOGIA, SAÚDE, HISTÓRIA. Até 12 chars.
-- Miolo: segue os padrões de `heuristicas-virais.md` §5 (curiosity gap honesto,
-  número específico, polêmica/posição, citação de impacto entre aspas). CAPS no
-  miolo em no máximo 1 palavra; nunca prometer o que o clip não entrega.
-- 1–2 hashtags de nicho/tema no final. **SEM `#shorts` no título** (vai na
-  descrição; aqui só desperdiça 7 chars).
+- **CAIXA ALTA obrigatória** no título inteiro — chama mais atenção no feed.
+- O texto segue os padrões de `heuristicas-virais.md` §5 (curiosity gap honesto,
+  número específico, polêmica/posição, citação de impacto). É a frase que faz a
+  pessoa parar e clicar; **nunca prometer o que o clip não entrega.**
+- **Sem categoria**, **sem hashtags no título** (hashtags vão só na descrição,
+  bloco 4, e nas `tags`). Sem pipes/separadores decorativos.
 - Proibido `<` e `>` (a API do YouTube rejeita).
 
-Orçamento de caracteres (limite duro da API: 100):
+Orçamento: **limite duro da API 100 chars**; **alvo <= 70** (mobile trunca ~70, e
+todo o gancho precisa aparecer). Aviso de lint acima de ~85.
 
-| Peça | Chars |
-|---|---|
-| CATEGORIA | <= 12 |
-| ` \| ` x2 | 6 |
-| miolo | <= 55 |
-| 1–2 hashtags | <= 25 |
-| **Total** | **alvo <= 85** (aviso acima); 100 = erro |
+### Variantes para teste A/B (`title_alts`)
 
-Mobile trunca ~70 chars: CATEGORIA + miolo carregam toda a informação; as
-hashtags no fim são o sacrificável.
+O `title` é a aposta principal (rank 1). `title_alts` é um **pool ranqueado de até
+10 variantes** (best-first) para teste A/B — todas no mesmo padrão (CAIXA ALTA, sem
+categoria/hashtags, <= 70 chars, sem clickbait mentiroso).
+
+- **Cada variante ataca um ângulo diferente** do MESMO clip (não são reescritas
+  triviais): curiosity gap, número/dado, contradição, citação de impacto entre
+  aspas, pergunta direta, callout ("VOCÊ...", "NINGUÉM TE CONTA..."), perda/medo,
+  autoridade/bastidor. Quanto mais distintos os ângulos, melhor o teste.
+- **Ranqueie** por potencial de CTR (a mais forte primeiro = vira o `title`).
+- **Como testar:** o YouTube Studio ("Testar e comparar") rotaciona **até 3 títulos**
+  e mede retenção/CTR — recurso **só do Studio, não da API**. Use as 3 primeiras do
+  pool no teste nativo; as demais ficam de reserva para trocar depois. A Data API
+  não rotaciona título automaticamente.
+
+### Palavras chamativas (power words pt-BR)
+
+Vocabulário de alto CTR para os títulos/variantes — usar com **honestidade** (a
+palavra tem que refletir o clip, senão vira clickbait e mata o canal):
+
+- **Revelação/choque:** REVELADO, EXPÔS, ESCANCAROU, A VERDADE SOBRE, O SEGREDO,
+  NINGUÉM TE CONTA, BASTIDORES, VAZOU, ADMITIU, CONFESSOU.
+- **Conflito/polêmica:** DETONOU, ALFINETOU, RESPONDEU, CALOU, DESMASCAROU, CANSOU,
+  RASGOU, POLÊMICA, GUERRA, x VERSUS y.
+- **Curiosidade/urgência:** POR QUE, O QUE NINGUÉM VIU, ATÉ O FIM, O ERRO QUE,
+  O MOMENTO EM QUE, VOCÊ NÃO VAI ACREDITAR (só se o clip sustenta), AGORA.
+- **Número/perda:** cifras (R$), porcentagens, "3 SINAIS", "PERDEU TUDO",
+  "CUSTOU CARO", "O PREÇO DE".
+- Evite: caps-lock gritado sem gancho, promessa não cumprida, sensacionalismo que
+  o clip não entrega, e repetir a MESMA palavra em todas as variantes.
 
 ## Descrição
 
@@ -98,6 +120,27 @@ Regras de uso das `default_hashtags` (pesquisa 2026):
   clip — nunca como padrão.
 - Hashtags classificam o tópico, não amplificam: a distribuição real vem de
   retenção e engajamento. Não sacrifique a copy por hashtag.
+
+## Miniatura (`thumbnail_text`)
+
+Texto queimado na miniatura (thumbnail) do clip — **não** é o título, é
+linguagem de thumbnail: curta, emocional, alto contraste. Objeto no `clips.json`:
+
+```json
+"thumbnail_text": {"impact": "PERDI R$ 40 MIL", "hooks": ["VOCÊ NÃO SABIA?", "ELE ADMITIU"]}
+```
+
+- `impact`: a frase MAIS forte do clip (a "citação de impacto" da
+  `heuristicas-virais.md` §5 — número, promessa, contradição). **CAIXA ALTA,
+  <= 40 chars.** É a manchete grande da imagem.
+- `hooks`: **2–3** ganchos ainda mais curtos (**<= 30 chars** cada), CAIXA ALTA,
+  que criam curiosidade sem repetir o `impact`.
+- Sem `#`, sem `<`/`>`, pontuação mínima (`?`/`!` no máximo). Acentos pt-BR OK
+  (a fonte renderiza Ã/Ç/É).
+- Coerente com o nicho e com o que o clip mostra — **nunca** prometer o que não
+  aparece. Vale para short e corte.
+- Espelho de avisos em código: `contracts.lint_copy` (impact vazio/longo, hooks
+  fora de 2–3). Ausência não bloqueia: o render tem fallback para `hook_text`.
 
 ## Escopo
 

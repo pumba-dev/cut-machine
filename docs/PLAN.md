@@ -93,12 +93,15 @@ social-accounts-agent/
       "dominant_signal": "pico emocional",
       "loop_potential": false,
       "audio_risk": false,                // true se prob média das palavras < 0.5
+      "thumbnail_ts": 1256.40,            // clip-scout: frame chamativo p/ a miniatura
       "score": 87,
       "score_breakdown": {"hook": 30, "retencao": 27, "compartilhabilidade": 18, "clareza": 12},
       "title": null, "title_alts": [], "description": null, "tags": [],   // copywriter preenche
+      "thumbnail_text": null,             // copywriter: {"impact": "...", "hooks": ["...", "..."]}
       "captions": {"burn": true, "ass_path": "video-output/abc123/abc123-s01/abc123-s01.ass"},
-      "render": {"crop": "center", "target_resolution": "1080x1920",
-                 "output_path": "video-output/abc123/abc123-s01/abc123-s01.mp4", "rendered_at": null, "actual_duration_s": null},
+      "render": {"crop": "blur", "target_resolution": "1080x1920",
+                 "output_path": "video-output/abc123/abc123-s01/abc123-s01.mp4", "rendered_at": null,
+                 "actual_duration_s": null, "thumbnail_path": null, "thumbnail_ts": null},
       "publish": {"platform": "youtube", "privacy": "private", "category_id": "22",
                   "made_for_kids": false, "youtube_video_id": null, "youtube_url": null, "published_at": null},
       "status": "planned",
@@ -110,7 +113,8 @@ social-accounts-agent/
 ```
 
 Regras:
-- `format`: `short` → 15–59s, 1080x1920, crop center, legendas queimadas; `corte` → 120–600s, 1920x1080, sem burn na POC.
+- `format`: `short` → 15–59s, 1080x1920, sem crop (vídeo inteiro sobre fundo blur), legendas queimadas; `corte` → 480–900s (8–15 min, ≥8 min p/ monetização), 1920x1080, sem burn, com moldura de marca preto+amarelo + CTA de inscrição (`branding.py`).
+- Miniatura (ambos os formatos): `thumbnail_ts` (clip-scout) + `thumbnail_text` (copywriter) → `render.thumbnail_path` (`thumbnail.py`, gerada no render; `thumbnails.set` best-effort no upload).
 - `status`: `planned → approved → rendering → rendered → queued → uploading → published`; desvios `rejected` | `failed` (com `error`). `queued` existe por causa da quota de 6/dia.
 - Rubrica (de references/heuristicas-virais.md): 4 eixos 0–10 × pesos — hook ×3.5, retenção ×3.0, compartilhabilidade ×2.0, clareza ×1.5 = máx 100. Propor só score ≥ 60; veto se clareza ≤ 3. Densidade: 4–8 shorts + 2–4 cortes por hora; zero clips viáveis é resultado válido (terminar graciosamente com relatório).
 - `internal_cuts` (jump cuts) FORA do escopo da POC — cortes contíguos apenas. Campo pode existir no futuro; render v1 ignora.

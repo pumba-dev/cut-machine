@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import contracts, paths, state
+from core import accounts, contracts, paths, state
 from core.cli import emit, fail
 from core.render import render_clip
 
@@ -18,6 +18,20 @@ def _now() -> str:
 
 def _output_rel(video_id: str, clip_id: str) -> str:
     return paths.clip_output_path(video_id, clip_id).relative_to(paths.ROOT).as_posix()
+
+
+def _rel(path) -> str:
+    return Path(path).resolve().relative_to(paths.ROOT).as_posix()
+
+
+def _account_for(clip: dict) -> dict | None:
+    """Conta do clip (para o brand da moldura). Tolerante: sem config valida,
+    o render cai nos defaults de brand."""
+    pub = clip.get("publish") or {}
+    try:
+        return accounts.get_account(pub.get("platform") or "youtube", pub.get("account"))
+    except Exception:
+        return None
 
 
 def _skip_result(video_id: str, plan: dict, clip: dict) -> dict:
@@ -127,7 +141,7 @@ def main() -> None:
         contracts.set_clip_status(clip, "rendering")
         contracts.save_plan(clips_file, plan)
         try:
-            info = render_clip(clip, video_id, transcript)
+            info = render_clip(clip, video_id, transcript, account=_account_for(clip))
         except Exception as exc:
             msg = str(exc)
             contracts.set_clip_status(clip, "failed", error=msg)
@@ -141,10 +155,15 @@ def main() -> None:
         render_block["output_path"] = _output_rel(video_id, cid)
         render_block["rendered_at"] = _now()
         render_block["actual_duration_s"] = round(info["duration_s"], 3)
+        if info.get("thumbnail_path") is not None:
+            render_block["thumbnail_path"] = _rel(info["thumbnail_path"])
+            render_block["thumbnail_ts"] = round(float(info["thumbnail_ts"]), 3)
         contracts.set_clip_status(clip, "rendered")
         contracts.save_plan(clips_file, plan)
         result = {"clip_id": cid, "status": "rendered",
                   "output": render_block["output_path"]}
+        if info.get("thumbnail_error"):
+            result["thumbnail_error"] = info["thumbnail_error"]
         meta_err = _save_metadata(video_id, plan, clip)
         if meta_err:
             result["metadata_error"] = meta_err

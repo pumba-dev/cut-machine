@@ -28,7 +28,7 @@ download -> transcribe -> plan -> copy -> render -> qa -> publish
 | Transcrição word-level | `scripts/transcribe.py` (faster-whisper CUDA) |
 | Seleção de momentos virais, start/end finos | **clip-scout** (LLM) |
 | Títulos, descrições, tags | **copywriter** (LLM) |
-| Geração do .ass + corte/crop/burn/encode | `scripts/render_clip.py` (ffmpeg) |
+| Geração do .ass + corte/crop/burn/encode + moldura do corte + miniatura | `scripts/render_clip.py` (ffmpeg; `core/render/branding.py` + `thumbnail.py`) |
 | Validação técnica do render | **qa-reviewer** (LLM orquestrando ffprobe) |
 | OAuth + upload | `scripts/auth.py` / `scripts/upload_clip.py` |
 | Retomada, checkpoints, retry | **você** (orquestrador) |
@@ -39,27 +39,29 @@ download -> transcribe -> plan -> copy -> render -> qa -> publish
 - Timestamps sempre em **segundos float** (`1234.56`), alinhados a fronteiras de palavras do `transcript.json`.
 - **Contrato de script**: todo CLI em `scripts/` é idempotente (emite `{"ok": true, "skipped": true}` se já feito), imprime **UMA linha JSON como último output** no stdout (`core.cli.emit`), atualiza `state.json` sozinho, I/O sempre UTF-8. Você lê só essa última linha.
 - `clips.json` é o **único contrato** entre subagentes e scripts — nenhum dado de clip vive fora dele. Dono por campo (ver `core/contracts.py`): clip-scout cria o clip + análise; copywriter preenche copy; `render_clip.py` preenche `render.*`; `upload_clip.py` preenche `publish.*`; humano/você transiciona `approved/rejected`. **Ninguém sobrescreve campo de outro dono.**
-- Cada clip tem subpasta própria `video-output/<video_id>/<clip_id>/` com `<clip_id>.mp4`, `<clip_id>.ass` (só shorts) e `metadata.json` — este último é **derivado** de `clips.json` (gerado por `render_clip.py`, regenerado por `upload_clip.py` após publish). Ninguém edita `metadata.json` à mão; subagentes LLM não escrevem nele.
-- Formatos (`core.contracts.FORMAT_RULES`): `short` 15–59s, 1080x1920, crop central, legendas queimadas; `corte` 120–600s, 1920x1080, sem burn.
+- Cada clip tem subpasta própria `video-output/<video_id>/<clip_id>/` com `<clip_id>.mp4`, `<clip_id>.ass` (só shorts), `<clip_id>.border.ass` (só cortes), `<clip_id>.thumb.jpg` (miniatura, ambos os formatos) e `metadata.json` — este último é **derivado** de `clips.json` (gerado por `render_clip.py`, regenerado por `upload_clip.py` após publish). Ninguém edita `metadata.json` à mão; subagentes LLM não escrevem nele.
+- Formatos (`core.contracts.FORMAT_RULES`): `short` 15–59s, 1080x1920, sem crop (vídeo inteiro sobre fundo blur), legendas queimadas; `corte` 480–900s (8–15 min, ≥8 min para monetização), 1920x1080, sem burn.
 
 ## 5. Comandos canônicos
 
 ```
 python scripts/download.py    --url <URL>
-python scripts/transcribe.py  --video-id <id> [--model large-v3] [--device auto|cuda|cpu] [--compute int8]
+python scripts/transcribe.py  --video-id <id> [--model large-v3] [--device auto|cuda|cpu] [--compute int8] [--no-diarize] [--speakers N]
+python scripts/diarize.py     --video-id <id> [--speakers N] [--force]
 python scripts/render_clip.py --video-id <id> [--clip <clip_id>] [--all-approved]
 python scripts/upload_clip.py --video-id <id> --clip <clip_id> [--platform youtube] [--account <account_id>]
 python scripts/auth.py        --platform youtube [--account <account_id>]
 ```
 
 Render é **sequencial** por clip (GPU 6GB não comporta paralelismo folgado).
+`transcribe.py` já diariza os falantes por padrão (grava `spk`/`speaker` no `transcript.json` → cor por falante nas legendas). Modo automático usa teto de clusters + fusão dos micro-clusters de ruído (contagem por threshold é inutilizável — dependente da duração). `diarize.py` só é preciso para **retrofit** de transcript antigo ou re-diarizar com `--speakers N` (número exato, caminho confiável). Diarização roda em CPU (sem VRAM), baixa modelos ONNX sob demanda em `models/` no 1º uso e falha degrada para cor única (não derruba a transcrição). **Confira `transcript.json.speakers` após transcrever**: se destoar do esperado (podcast costuma ter 2–3), re-rode `diarize.py --speakers N --force` com o número real.
 
 ## 6. Subagentes (Task)
 
 | Agente | Quando spawnar | Faz |
 |---|---|---|
-| `clip-scout` | após `transcribe` done | lê `transcript.compact.json` + `references/heuristicas-virais.md`; escreve clips `planned` em `clips.json` (start/end, hook, score, rationale) |
-| `copywriter` | após `plan` done | preenche `title`, `title_alts`, `description`, `tags` dos clips `planned` |
+| `clip-scout` | após `transcribe` done | lê `transcript.compact.json` + `references/heuristicas-virais.md`; escreve clips `planned` em `clips.json` (start/end, hook, score, rationale, `thumbnail_ts`) |
+| `copywriter` | após `plan` done | preenche `title`, `title_alts`, `description`, `tags`, `thumbnail_text` dos clips `planned` |
 | `qa-reviewer` | após `render` | ffprobe em cada mp4 (resolução, duração ±0.5s, áudio); mantém `rendered` ou marca `failed` |
 | `publisher` | só após aprovação explícita do usuário | roda `upload_clip.py` por clip, valida retorno, registra `publish.*`; em `quotaExceeded` para tudo e reporta |
 
@@ -90,9 +92,13 @@ Passe sempre no prompt do subagente: `video_id`, caminho da pasta do vídeo (`vi
 1. **Pós-plan/copy, pré-render**: rode `python scripts/validate_plan.py --video-id <id>` ANTES da tabela. `errors` → re-spawn do copywriter **1 vez** com os erros no prompt; `warnings` → liste sob a tabela como avisos de copy para o humano decidir. Apresente tabela (id | formato | start–end | duração | score | chars | título **completo**) e peça aprovação. Aplique `rejected` conforme resposta; demais viram `approved`. Default: sugerir aprovação apenas de clips com `score >= 70`.
 2. **Pré-publish**: confirme quota (upload = 1600 unidades; 10k/dia → **~6 uploads/dia**; respeite `daily_upload_limit` da conta). Excedente fica `queued` ordenado por score.
 
-**Uploads via API são SEMPRE `privacy: private`** — projeto GCP não-auditado trava uploads como
-private (política do YouTube). A publicação real é decisão manual do usuário no YouTube Studio.
-Nunca tente contornar isso.
+**Privacidade do upload — default `public`** (revisado em 2026-07-08). Um upload de teste
+(`KGs0aTqKwaQ-c04`) subiu com `privacyStatus=public` + `uploadStatus=uploaded` (sem rejection)
+e `thumbnails.set` funcionou → este projeto GCP aceita público e o canal é verificado. A premissa
+antiga de "locked private" **não se aplica** a este projeto. Pipeline agora sobe `public` por
+padrão (`privacy` por clip pode ser `private`/`unlisted` para exceções). Ainda assim: publicar é
+ação irreversível/externa — confirme com o usuário antes de subir em lote, e valide na 1ª vez que
+o vídeo continua público (o token só tem escopo de leitura após re-auth com `youtube.readonly`).
 
 ## 10. Tratamento de erro
 

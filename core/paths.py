@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = ROOT / "video-output"
+MODELS_ROOT = ROOT / "models"
 SECRETS_ROOT = ROOT / "secrets"
 CONFIG_DIR = ROOT / "config"
 REFERENCES_DIR = ROOT / "references"
@@ -61,6 +62,21 @@ def clip_output_path(video_id: str, clip_id: str) -> Path:
 
 def clip_ass_path(video_id: str, clip_id: str) -> Path:
     return clip_dir(video_id, clip_id) / f"{clip_id}.ass"
+
+
+def clip_border_ass_path(video_id: str, clip_id: str) -> Path:
+    """.ass do texto de marca queimado na borda do corte (so formato corte)."""
+    return clip_dir(video_id, clip_id) / f"{clip_id}.border.ass"
+
+
+def clip_thumbnail_ass_path(video_id: str, clip_id: str) -> Path:
+    """.ass das frases de impacto/gancho sobrepostas na miniatura."""
+    return clip_dir(video_id, clip_id) / f"{clip_id}.thumb.ass"
+
+
+def clip_thumbnail_path(video_id: str, clip_id: str) -> Path:
+    """Miniatura (thumbnail) do clip para upload manual/API."""
+    return clip_dir(video_id, clip_id) / f"{clip_id}.thumb.jpg"
 
 
 def clip_metadata_path(video_id: str, clip_id: str) -> Path:

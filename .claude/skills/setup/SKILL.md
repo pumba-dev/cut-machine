@@ -26,7 +26,8 @@ Rode os quatro testes e reporte o resultado de cada um:
 1. `ffmpeg -version` — deve imprimir a versao.
 2. `ffmpeg -filters | findstr ass` — deve listar o filtro `ass` (necessario para queimar legendas). Se nao aparecer, o build do ffmpeg nao tem libass: reinstalar com o pacote Gyan.FFmpeg (build full).
 3. `python -c "import ctranslate2; print(ctranslate2.get_cuda_device_count())"` — esperado `1` (GTX 1660 SUPER). Se imprimir `0`, a transcricao vai cair em CPU (funciona, porem lenta, e o transcribe.py usa fallback modelo `small`); avise o usuario e siga em frente.
-4. `python -m compileall core scripts -q` — exit code 0, sem output. Erro aqui indica problema de sintaxe no repo; pare e reporte.
+4. `python -c "import sherpa_onnx; print(sherpa_onnx.__version__)"` — deve imprimir a versao (>= 1.10.28). Necessario para a diarizacao de falantes (cor por falante nas legendas). Os modelos ONNX (~103 MB) sao baixados sob demanda na primeira transcricao, para `models/diarization/` — nao baixe aqui. Se falhar o import, `pip install sherpa-onnx`.
+5. `python -m compileall core scripts -q` — exit code 0, sem output. Erro aqui indica problema de sintaxe no repo; pare e reporte.
 
 ## 4. Projeto GCP + credenciais do YouTube (acao do usuario)
 
