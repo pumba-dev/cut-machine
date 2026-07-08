@@ -13,7 +13,9 @@
       "brand": {
         "border_text": "Curta e se inscreva no canal",
         "border_color": "#000000",
-        "accent_color": "#FFD93D"
+        "accent_color": "#FFD93D",
+        "short_frame": "assets/short-frame/principal.png",
+        "short_bg_color": "#111111"
       },
       "default_hashtags": [
         "#shorts",

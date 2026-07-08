@@ -14,6 +14,7 @@ from ..contracts import FORMAT_RULES
 from ..media import video_info
 from .branding import build_border_ass, build_corte_filter, resolve_brand
 from .captions import build_ass
+from .short_frame import BG_FALLBACK, build_short_filter
 from .thumbnail import generate_thumbnail
 
 
@@ -21,29 +22,40 @@ def _t(value: float) -> str:
     return f"{float(value):.3f}"
 
 
-def build_short_cmd(start: float, dur: float, ass_filename: str, out_filename: str,
-                    source: str = "source.mp4") -> list[str]:
-    """Comando ffmpeg para short 1080x1920 com legendas queimadas.
+def _resolve_short_frame(rel: str | None) -> str | None:
+    """Caminho absoluto do PNG de moldura do short, ou None se ausente/inexistente.
 
-    Sem crop: o video original inteiro (16:9) e escalado para caber dentro
-    de 1080x1920 e centralizado sobre um fundo blurado (o mesmo frame,
-    escalado para preencher o canvas e desfocado). Fundo (bg) e primeiro
-    plano (fg) sao gerados a partir da mesma fonte para nao exigir arquivo
-    de imagem extra. `trunc(iw/2)*2` no fg garante dimensao par (exigido
-    por yuv420p) apos o scale com aspect ratio preservado. `-map 0:a?`
-    torna o audio opcional (fonte sem audio nao quebra o comando).
-    ass_filename deve ser relativo ao cwd do processo.
+    Path relativo e resolvido a partir da raiz do repo. Retornar absoluto e
+    seguro no `-i` do ffmpeg (so o filtro `ass=` sofre com escaping no Windows).
     """
-    filter_complex = (
-        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
-        "crop=1080:1920,gblur=sigma=20[bg];"
-        "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
-        "scale=trunc(iw/2)*2:trunc(ih/2)*2[fg];"
-        f"[bg][fg]overlay=(W-w)/2:(H-h)/2,ass={ass_filename}[v]"
-    )
-    return [
-        "ffmpeg",
-        "-ss", _t(start), "-t", _t(dur), "-i", source,
+    if not rel or not str(rel).strip():
+        return None
+    p = Path(rel)
+    if not p.is_absolute():
+        p = paths.ROOT / rel
+    return str(p.resolve()) if p.exists() else None
+
+
+def build_short_cmd(start: float, dur: float, captions_ass: str,
+                    out_filename: str, source: str = "source.mp4",
+                    frame_png: str | None = None, bg_hex: str = BG_FALLBACK) -> list[str]:
+    """Comando ffmpeg para short 1080x1920 com moldura fixa + legendas queimadas.
+
+    Fundo ESTATICO (nao mais blur): arte PNG decorativa da conta (`frame_png`,
+    caminho absoluto — seguro em `-i`, ao contrario do filtro `ass=`) ou, sem
+    PNG, uma cor chapada (`bg_hex`). O video 16:9 entra SEM CROP numa janela
+    (escala por largura, altura par via `-2`) sobreposta a moldura;
+    `overlay=...:shortest=1` limita a saida a duracao do video (o fundo/PNG e
+    fonte infinita — `-loop 1` no PNG). Toda a marca/CTA ja vem embutida na arte
+    PNG; so `captions_ass` (legendas) e queimado por cima, por nome relativo ao
+    cwd. `-map 0:a?` torna o audio opcional (fonte sem audio nao quebra o comando).
+    """
+    has_png = bool(frame_png)
+    filter_complex = build_short_filter(bg_hex, has_png, captions_ass)
+    cmd = ["ffmpeg", "-ss", _t(start), "-t", _t(dur), "-i", source]
+    if has_png:
+        cmd += ["-loop", "1", "-i", frame_png]
+    cmd += [
         "-filter_complex", filter_complex,
         "-map", "[v]", "-map", "0:a?",
         "-r", "30",
@@ -53,6 +65,7 @@ def build_short_cmd(start: float, dur: float, ass_filename: str, out_filename: s
         "-movflags", "+faststart",
         "-y", out_filename,
     ]
+    return cmd
 
 
 def build_corte_cmd(start: float, dur: float, out_filename: str,
@@ -111,9 +124,14 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
     if rules["burn_captions"]:
         if not transcript:
             raise ValueError(f"{clip['id']}: formato {fmt} exige transcript para legendas")
+        brand = resolve_brand(account)
         ass_path = paths.clip_ass_path(video_id, clip["id"])
         ass_path.write_text(build_ass(clip, transcript), encoding="utf-8")
-        cmd = build_short_cmd(start, dur, ass_path.name, out_name, source=source_rel)
+        frame_png = _resolve_short_frame(brand.get("short_frame"))
+        cmd = build_short_cmd(
+            start, dur, ass_path.name, out_name, source=source_rel,
+            frame_png=frame_png, bg_hex=brand.get("short_bg_color", BG_FALLBACK),
+        )
     elif rules.get("border"):
         brand = resolve_brand(account)
         border_ass = paths.clip_border_ass_path(video_id, clip["id"])

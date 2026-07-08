@@ -89,7 +89,7 @@ Cada clip (ordene por score decrescente):
  "tags": [],
  "thumbnail_text": null,
  "captions": {"burn": true, "ass_path": "<clip_id>/<clip_id>.ass"},
- "render": {"crop": "blur", "target_resolution": "1080x1920",
+ "render": {"crop": "frame", "target_resolution": "1080x1920",
             "output_path": "<clip_id>/<clip_id>.mp4",
             "rendered_at": null, "actual_duration_s": null},
  "publish": {"platform": "youtube", "account": "<conta informada ou principal>",
@@ -101,7 +101,7 @@ Cada clip (ordene por score decrescente):
 ```
 
 Regras por formato (FORMAT_RULES):
-- `short`: `render.crop = "blur"`, `render.target_resolution = "1080x1920"`, `captions.burn = true`.
+- `short`: `render.crop = "frame"`, `render.target_resolution = "1080x1920"`, `captions.burn = true`.
 - `corte`: `render.crop = "none"`, `render.target_resolution = "1920x1080"`, `captions.burn = false`.
 
 Campos de copy (`title`, `title_alts`, `description`, `tags`, `thumbnail_text`) ficam null/vazios — são do copywriter, não seus. Você preenche `thumbnail_ts` (é análise, não copy). `rejected_notable` com 3–5 itens para o humano auditar suas decisões.

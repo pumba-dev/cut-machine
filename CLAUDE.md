@@ -40,7 +40,7 @@ download -> transcribe -> plan -> copy -> render -> qa -> publish
 - **Contrato de script**: todo CLI em `scripts/` é idempotente (emite `{"ok": true, "skipped": true}` se já feito), imprime **UMA linha JSON como último output** no stdout (`core.cli.emit`), atualiza `state.json` sozinho, I/O sempre UTF-8. Você lê só essa última linha.
 - `clips.json` é o **único contrato** entre subagentes e scripts — nenhum dado de clip vive fora dele. Dono por campo (ver `core/contracts.py`): clip-scout cria o clip + análise; copywriter preenche copy; `render_clip.py` preenche `render.*`; `upload_clip.py` preenche `publish.*`; humano/você transiciona `approved/rejected`. **Ninguém sobrescreve campo de outro dono.**
 - Cada clip tem subpasta própria `video-output/<video_id>/<clip_id>/` com `<clip_id>.mp4`, `<clip_id>.ass` (só shorts), `<clip_id>.border.ass` (só cortes), `<clip_id>.thumb.jpg` (miniatura, ambos os formatos) e `metadata.json` — este último é **derivado** de `clips.json` (gerado por `render_clip.py`, regenerado por `upload_clip.py` após publish). Ninguém edita `metadata.json` à mão; subagentes LLM não escrevem nele.
-- Formatos (`core.contracts.FORMAT_RULES`): `short` 15–59s, 1080x1920, sem crop (vídeo inteiro sobre fundo blur), legendas queimadas; `corte` 480–900s (8–15 min, ≥8 min para monetização), 1920x1080, sem burn.
+- Formatos (`core.contracts.FORMAT_RULES`): `short` 15–59s, 1080x1920, sem crop (vídeo numa janela sobre moldura fixa de marca — `core/render/short_frame.py`; substituiu o fundo blur), legendas queimadas; `corte` 480–900s (8–15 min, ≥8 min para monetização), 1920x1080, sem burn.
 
 ## 5. Comandos canônicos
 
@@ -90,7 +90,7 @@ Passe sempre no prompt do subagente: `video_id`, caminho da pasta do vídeo (`vi
 ## 9. Checkpoints humanos OBRIGATÓRIOS
 
 1. **Pós-plan/copy, pré-render**: rode `python scripts/validate_plan.py --video-id <id>` ANTES da tabela. `errors` → re-spawn do copywriter **1 vez** com os erros no prompt; `warnings` → liste sob a tabela como avisos de copy para o humano decidir. Apresente tabela (id | formato | start–end | duração | score | chars | título **completo**) e peça aprovação. Aplique `rejected` conforme resposta; demais viram `approved`. Default: sugerir aprovação apenas de clips com `score >= 70`.
-2. **Pré-publish**: confirme quota (upload = 1600 unidades; 10k/dia → **~6 uploads/dia**; respeite `daily_upload_limit` da conta). Excedente fica `queued` ordenado por score.
+2. **Pré-publish**: confirme quota — **dois contadores separados** (revisado 2026-07-08): **uploads = 100/dia** (teto real) e **queries = 10k/dia** (`videos.insert` 1600, `thumbnails.set` 50; upload NÃO drena as 10k a 1600/un). Respeite `daily_upload_limit` da conta (100). Excedente fica `queued` ordenado por score.
 
 **Privacidade do upload — default `public`** (revisado em 2026-07-08). Um upload de teste
 (`KGs0aTqKwaQ-c04`) subiu com `privacyStatus=public` + `uploadStatus=uploaded` (sem rejection)

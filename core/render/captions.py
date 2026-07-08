@@ -2,7 +2,8 @@
 
 Tempos sao rebased (t - clip.start) porque o ffmpeg corta com -ss antes de
 -i e o output comeca em t=0. Estilo base: Arial Black 110 @ PlayRes
-1080x1920, Outline 8, Alignment 2 (baixo-centro), MarginV 550.
+1080x1920, Outline 8, Alignment 2 (baixo-centro), MarginV 690 (sobre a
+janela do video da moldura fixa do short — core.render.short_frame).
 
 Cores por falante: um Style por falante (Cap0..Cap4, paleta fixa), palavra
 usa o campo `spk` gravado pela diarizacao (core.diarize). Transcript sem
@@ -20,8 +21,10 @@ SPEAKER_COLOURS = [
     "&H0000A5FF",  # spk 4: laranja #FFA500
 ]
 
+# MarginV 690: legendas sobre a JANELA do video (y658-1301 da moldura fixa),
+# nao mais no centro-baixo do canvas antigo (fundo blur). Ver core/render/short_frame.py.
 _STYLE_FMT = ("Style: {name},Arial Black,110,{colour},&H0000FFFF,&H00000000,"
-              "&H96000000,-1,0,0,0,100,100,0,0,1,8,0,2,60,60,550,1")
+              "&H96000000,-1,0,0,0,100,100,0,0,1,8,0,2,60,60,690,1")
 
 
 def _ass_header() -> str:

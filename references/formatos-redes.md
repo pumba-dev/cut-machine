@@ -5,7 +5,7 @@ Specs de render, metadados e publicação por formato/plataforma. Nomenclatura d
 ## YouTube
 
 ### Formato `short` (YouTube Shorts)
-- **Resolução:** 1080x1920 (9:16 vertical). Sem crop: o vídeo original (16:9) inteiro é escalado e centralizado sobre um fundo desfocado (blur) gerado a partir do próprio frame, preenchendo o canvas sem cortar imagem.
+- **Resolução:** 1080x1920 (9:16 vertical). Sem crop: o vídeo original (16:9) inteiro é escalado numa **janela** (1020×574) sobre uma **moldura fixa de marca** (arte PNG por conta em `brand.short_frame` ou cor chapada de fallback), sem cortar imagem. Substituiu o antigo fundo blur (animado, enjoava). **Toda** a marca (nome/número/@handle) e as CTAs (curtir/comentar/inscrever) já vêm **embutidas na própria arte PNG** (estética 8-bit); o render só compõe PNG + vídeo + legendas — não desenha texto por cima. Spec em `references/estilo-legendas.md` ("Moldura do short") + `core/render/short_frame.py`.
 - **Duração na POC: 15–59s.** O YouTube aceita Shorts de até 3 min desde 2024, mas a POC limita a 59s por decisão de escopo (clipes curtos + legendas grandes performam melhor).
 - **Detecção de Shorts é automática** — não existe flag na API: vídeo enviado com aspecto vertical (ou quadrado) e duração ≤ 3 min é classificado como Short. O output `short` (1080x1920, <60s) vira Short sem nenhuma ação extra; um 16:9 permanece long-form mesmo se for curto.
 - **Legendas queimadas obrigatórias** (spec em `references/estilo-legendas.md`).
@@ -28,7 +28,7 @@ Specs de render, metadados e publicação por formato/plataforma. Nomenclatura d
 | `description` | 5000 **bytes** (UTF-8), não caracteres — a API conta bytes | curta e direta; links completos com `https://` |
 | `tags` | 500 caracteres somados (tag com espaço conta +2) | 10–15 tags (`references/padrao-copy.md`), soma ≤ 500; hashtags vão no fim da descrição/título, tags são campo separado |
 
-Campos fixos do bloco `publish` do clips.json: `privacy: "private"` (ver `references/youtube-api.md`), `category_id: "22"` (People & Blogs) por padrão, `made_for_kids: false`.
+Campos do bloco `publish` do clips.json: `privacy: "public"` por padrão (revisado 2026-07-08; `private`/`unlisted` por clip só para exceções — ver `references/youtube-api.md`), `category_id: "22"` (People & Blogs) por padrão, `made_for_kids: false`.
 
 ### Miniatura (thumbnail)
 

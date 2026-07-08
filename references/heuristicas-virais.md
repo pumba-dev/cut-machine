@@ -39,7 +39,7 @@ Score = soma ponderada de 4 eixos. Avaliar cada eixo de 0–10 e multiplicar pel
 
 ### `short` (9:16 vertical)
 - **Ideal: 20–45s. Máximo aceito na POC: 59s.** Abaixo de 15s raramente entrega payoff; acima de 45s exige retenção excepcional.
-- Escolher `short` quando: o momento é UMA ideia só (1 história, 1 opinião, 1 dica); o pico emocional/payoff cabe a <45s do hook. Sem crop: o render encaixa o vídeo original inteiro sobre um fundo blur, então não depende de talking-head centralizado — tela/slides largos aparecem inteiros.
+- Escolher `short` quando: o momento é UMA ideia só (1 história, 1 opinião, 1 dica); o pico emocional/payoff cabe a <45s do hook. Sem crop: o render encaixa o vídeo original inteiro numa janela sobre uma moldura fixa de marca, então não depende de talking-head centralizado — tela/slides largos aparecem inteiros.
 
 ### `corte` (16:9, 8–15 min)
 - **Ideal: 10–13 min. Limites duros: 8–15 min (480–900s).**

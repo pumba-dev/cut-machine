@@ -14,7 +14,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,Arial Black,110,&H00FFFFFF,&H0000FFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,8,0,2,60,60,550,1
+Style: Cap,Arial Black,110,&H00FFFFFF,&H0000FFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,8,0,2,60,60,690,1
 Style: Cap0,Arial Black,110,&H00FFFFFF,...   # branco  (falante 0 = quem mais fala)
 Style: Cap1,Arial Black,110,&H003DD9FF,...   # amarelo (falante 1)
 Style: Cap2,Arial Black,110,&H00FFCC66,...   # azul-claro (falante 2)
@@ -33,7 +33,7 @@ Style: Cap4,Arial Black,110,&H0000A5FF,...   # laranja (falante 4)
 | Bold | -1 | negrito ativado |
 | BorderStyle / Shadow | 1 / 0 | borda por outline, sem sombra deslocada |
 | Alignment | 2 | baixo-centro |
-| MarginL / MarginR / MarginV | 60 / 60 / 550 | bloco no centro-baixo do frame, acima da UI do Shorts |
+| MarginL / MarginR / MarginV | 60 / 60 / 690 | bloco sobre a janela do vídeo da moldura fixa (short_frame.py), acima da banda de engajamento |
 
 ## Cor por falante
 
@@ -70,6 +70,23 @@ Exemplo de evento (falante 1 = amarelo):
 Dialogue: 0,0:00:00.12,0:00:00.88,Cap1,,0,0,0,,ISSO MUDA TUDO
 ```
 
+## Moldura do short (`short_frame.py`)
+
+O short **não** leva texto de marca em ASS: o fundo é uma **arte PNG estática por
+conta** (`brand.short_frame`, estética 8-bit) que já traz **todo** o texto/ícones
+embutidos (nome do canal, número, @handle, CTAs de curtir/comentar/inscrever).
+Substituiu o antigo fundo blur (animado → enjoava). O render
+(`core/render/short_frame.py`) só compõe: **PNG de fundo + vídeo 16:9 sem crop na
+janela + legendas queimadas** — nenhum texto desenhado por cima.
+
+- **Janela do vídeo:** 1020×574 (sem crop), inset lateral ~30px, centralizada na
+  janela preta da arte (y658–1301 no canvas 1080×1920). Constantes `VIDEO_W/X/Y`.
+- **Fallback sem PNG:** cor chapada (`brand.short_bg_color`) — mata o enjoo mesmo
+  sem arte, porém sem marca; as legendas continuam.
+- **Legendas:** estilo `Cap` (acima), `MarginV 690`, caem sobre a janela do vídeo
+  (não sobre as bandas de marca da arte).
+- Trocar a identidade = trocar o PNG (a janela do vídeo deve casar com o desenho).
+
 ## Texto de marca do corte (`branding.py`)
 
 Diferente das legendas: aplica-se **só ao formato `corte`** (16:9) e é um texto
@@ -104,5 +121,5 @@ Frases queimadas na miniatura (short e corte), geradas por
 
 - **Retenção:** boa parte do consumo de Shorts começa sem som; legenda grande palavra-a-palavra segura o espectador nos 3 primeiros segundos (janela onde ocorre 50–60% do drop-off) e reforça o hook.
 - **Legibilidade:** CAIXA ALTA + Arial Black + outline 8 + fundo semi-transparente garantem leitura em tela pequena sobre fundo imprevisível.
-- **Zona segura:** `MarginV 550` mantém o texto fora dos ~25% inferiores do frame, que a UI do Shorts (título, canal, botões) cobre — ver `references/formatos-redes.md`. Como o vídeo original não é cropado (fundo blur preenche as laterais/topo/base), a margem também evita que a legenda caia sobre a faixa de fundo em vez do vídeo.
+- **Zona segura:** `MarginV 690` mantém a legenda **sobre a janela do vídeo** (y658–1301 da moldura fixa), acima da banda de engajamento da arte e fora dos ~25% inferiores que a UI do Shorts (título, canal, botões) cobre — ver `references/formatos-redes.md` e a seção "Moldura do short".
 - **Ritmo:** blocos de 2–4 palavras acompanham a cadência da fala; blocos maiores viram "parede de texto", perdem sincronia e cobrem o frame.

@@ -28,8 +28,12 @@ _BAR_Y = CANVAS_H - BAR_H
 
 BRAND_DEFAULTS = {
     "border_text": "Curta e se inscreva no canal",
-    "border_color": "#000000",   # fundo/borda
-    "accent_color": "#FFD93D",   # rim + texto
+    "border_color": "#000000",   # fundo/borda (corte)
+    "accent_color": "#FFD93D",   # rim + texto (corte)
+    # Moldura fixa do short (core/render/short_frame.py): a arte PNG ja traz
+    # todo o texto/marca embutido; o render so compoe PNG + video + legendas.
+    "short_frame": "",                  # path do PNG (rel. a raiz do repo); vazio = fallback solido
+    "short_bg_color": "#111111",        # cor do fallback quando nao ha short_frame
 }
 
 
