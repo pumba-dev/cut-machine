@@ -14,6 +14,8 @@ from ..contracts import FORMAT_RULES
 from ..media import video_info
 from .branding import build_border_ass, build_corte_filter, resolve_brand
 from .captions import build_ass
+from .corte_frame import BG_FALLBACK as CORTE_BG_FALLBACK
+from .corte_frame import build_corte_frame_filter
 from .short_frame import BG_FALLBACK, build_short_filter
 from .thumbnail import generate_thumbnail
 
@@ -22,8 +24,8 @@ def _t(value: float) -> str:
     return f"{float(value):.3f}"
 
 
-def _resolve_short_frame(rel: str | None) -> str | None:
-    """Caminho absoluto do PNG de moldura do short, ou None se ausente/inexistente.
+def _resolve_frame_png(rel: str | None) -> str | None:
+    """Caminho absoluto do PNG de moldura (short/corte), ou None se ausente/inexistente.
 
     Path relativo e resolvido a partir da raiz do repo. Retornar absoluto e
     seguro no `-i` do ffmpeg (so o filtro `ass=` sofre com escaping no Windows).
@@ -44,11 +46,15 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
     Fundo ESTATICO (nao mais blur): arte PNG decorativa da conta (`frame_png`,
     caminho absoluto — seguro em `-i`, ao contrario do filtro `ass=`) ou, sem
     PNG, uma cor chapada (`bg_hex`). O video 16:9 entra SEM CROP numa janela
-    (escala por largura, altura par via `-2`) sobreposta a moldura;
-    `overlay=...:shortest=1` limita a saida a duracao do video (o fundo/PNG e
-    fonte infinita — `-loop 1` no PNG). Toda a marca/CTA ja vem embutida na arte
-    PNG; so `captions_ass` (legendas) e queimado por cima, por nome relativo ao
-    cwd. `-map 0:a?` torna o audio opcional (fonte sem audio nao quebra o comando).
+    (escala por largura, altura par via `-2`) e a arte e sobreposta POR CIMA
+    (janela transparente). Toda a marca/CTA ja vem embutida na arte PNG; so
+    `captions_ass` (legendas) e queimado por cima, por nome relativo ao cwd.
+    `-map 0:a?` torna o audio opcional (fonte sem audio nao quebra o comando).
+
+    `-t _t(dur)` na SAIDA e obrigatorio: as fontes sinteticas do filtro (color +
+    `-loop 1` no PNG) sao infinitas e o `overlay(...:shortest=1)` sozinho NAO
+    encerra o grafo de dois overlays (`-t` no input so limita a leitura do
+    video); sem o `-t` de saida o encode nunca termina.
     """
     has_png = bool(frame_png)
     filter_complex = build_short_filter(bg_hex, has_png, captions_ass)
@@ -63,6 +69,7 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
+        "-t", _t(dur),
         "-y", out_filename,
     ]
     return cmd
@@ -70,22 +77,37 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
 
 def build_corte_cmd(start: float, dur: float, out_filename: str,
                     source: str = "source.mp4",
-                    filter_complex: str | None = None) -> list[str]:
+                    filter_complex: str | None = None,
+                    frame_png: str | None = None) -> list[str]:
     """Comando ffmpeg para corte 1920x1080.
 
     Com `filter_complex` (moldura de marca) aplica a cadeia -> [v] e mapeia
     video+audio explicitamente (`-map [v] -map 0:a?`, audio opcional). Sem
     ele, corte cru sem filtro de video (mapeamento default). filter_complex
     referencia o .border.ass por nome relativo ao cwd do processo.
+
+    Com `frame_png` (caminho absoluto), adiciona a arte da moldura como 2o input
+    (`-loop 1`); o proprio `filter_complex` deve entao vir de
+    `build_corte_frame_filter` (video sob a arte, janela transparente).
+
+    `-t _t(dur)` na SAIDA e obrigatorio quando ha `filter_complex` com fontes
+    sinteticas (color + `-loop 1` no PNG): elas sao infinitas e o
+    `overlay(...:shortest=1)` sozinho NAO encerra o grafo de dois overlays (o
+    `-t` de input so limita a leitura do video); sem ele o encode nunca termina.
     """
+    has_png = bool(frame_png)
     cmd = ["ffmpeg", "-ss", _t(start), "-t", _t(dur), "-i", source]
+    if has_png:
+        cmd += ["-loop", "1", "-i", frame_png]
     if filter_complex:
-        cmd += ["-filter_complex", filter_complex, "-map", "[v]", "-map", "0:a?"]
+        cmd += ["-filter_complex", filter_complex, "-map", "[v]", "-map", "0:a?",
+                "-r", "30"]
     cmd += [
         "-c:v", "libx264", "-preset", "medium", "-crf", "20",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
+        "-t", _t(dur),
         "-y", out_filename,
     ]
     return cmd
@@ -127,17 +149,25 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
         brand = resolve_brand(account)
         ass_path = paths.clip_ass_path(video_id, clip["id"])
         ass_path.write_text(build_ass(clip, transcript), encoding="utf-8")
-        frame_png = _resolve_short_frame(brand.get("short_frame"))
+        frame_png = _resolve_frame_png(brand.get("short_frame"))
         cmd = build_short_cmd(
             start, dur, ass_path.name, out_name, source=source_rel,
             frame_png=frame_png, bg_hex=brand.get("short_bg_color", BG_FALLBACK),
         )
     elif rules.get("border"):
         brand = resolve_brand(account)
-        border_ass = paths.clip_border_ass_path(video_id, clip["id"])
-        border_ass.write_text(build_border_ass(brand), encoding="utf-8")
-        fc = build_corte_filter(brand, border_ass.name)
-        cmd = build_corte_cmd(start, dur, out_name, source=source_rel, filter_complex=fc)
+        corte_png = _resolve_frame_png(brand.get("corte_frame"))
+        if corte_png:
+            # Arte PNG estatica (janela fixa) substitui a moldura gerada.
+            fc = build_corte_frame_filter(CORTE_BG_FALLBACK, has_png=True)
+            cmd = build_corte_cmd(start, dur, out_name, source=source_rel,
+                                  filter_complex=fc, frame_png=corte_png)
+        else:
+            # Fallback: moldura gerada (padding + rim + faixa de texto ASS).
+            border_ass = paths.clip_border_ass_path(video_id, clip["id"])
+            border_ass.write_text(build_border_ass(brand), encoding="utf-8")
+            fc = build_corte_filter(brand, border_ass.name)
+            cmd = build_corte_cmd(start, dur, out_name, source=source_rel, filter_complex=fc)
     else:
         cmd = build_corte_cmd(start, dur, out_name, source=source_rel)
 

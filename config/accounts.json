@@ -15,7 +15,8 @@
         "border_color": "#000000",
         "accent_color": "#FFD93D",
         "short_frame": "assets/short-frame/principal.png",
-        "short_bg_color": "#111111"
+        "short_bg_color": "#111111",
+        "corte_frame": "assets/corte-frame/principal.png"
       },
       "default_hashtags": [
         "#política",

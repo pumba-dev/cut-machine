@@ -34,6 +34,9 @@ BRAND_DEFAULTS = {
     # todo o texto/marca embutido; o render so compoe PNG + video + legendas.
     "short_frame": "",                  # path do PNG (rel. a raiz do repo); vazio = fallback solido
     "short_bg_color": "#111111",        # cor do fallback quando nao ha short_frame
+    # Moldura fixa do corte (core/render/corte_frame.py): idem, arte 16:9. Vazio
+    # = fallback para a moldura GERADA (padding + rim + faixa de texto ASS).
+    "corte_frame": "",                  # path do PNG (rel. a raiz do repo)
 }
 
 

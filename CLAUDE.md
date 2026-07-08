@@ -28,7 +28,7 @@ download -> transcribe -> plan -> copy -> render -> qa -> publish
 | Transcrição word-level | `scripts/transcribe.py` (faster-whisper CUDA) |
 | Seleção de momentos virais, start/end finos | **clip-scout** (LLM) |
 | Títulos, descrições, tags | **copywriter** (LLM) |
-| Geração do .ass + corte/crop/burn/encode + moldura do corte + miniatura | `scripts/render_clip.py` (ffmpeg; `core/render/branding.py` + `thumbnail.py`) |
+| Geração do .ass + corte/crop/burn/encode + moldura (short/corte) + miniatura | `scripts/render_clip.py` (ffmpeg; `core/render/short_frame.py` + `corte_frame.py` + `branding.py` + `thumbnail.py`) |
 | Validação técnica do render | **qa-reviewer** (LLM orquestrando ffprobe) |
 | OAuth + upload | `scripts/auth.py` / `scripts/upload_clip.py` |
 | Retomada, checkpoints, retry | **você** (orquestrador) |
@@ -39,8 +39,8 @@ download -> transcribe -> plan -> copy -> render -> qa -> publish
 - Timestamps sempre em **segundos float** (`1234.56`), alinhados a fronteiras de palavras do `transcript.json`.
 - **Contrato de script**: todo CLI em `scripts/` é idempotente (emite `{"ok": true, "skipped": true}` se já feito), imprime **UMA linha JSON como último output** no stdout (`core.cli.emit`), atualiza `state.json` sozinho, I/O sempre UTF-8. Você lê só essa última linha.
 - `clips.json` é o **único contrato** entre subagentes e scripts — nenhum dado de clip vive fora dele. Dono por campo (ver `core/contracts.py`): clip-scout cria o clip + análise; copywriter preenche copy; `render_clip.py` preenche `render.*`; `upload_clip.py` preenche `publish.*`; humano/você transiciona `approved/rejected`. **Ninguém sobrescreve campo de outro dono.**
-- Cada clip tem subpasta própria `video-output/<video_id>/<clip_id>/` com `<clip_id>.mp4`, `<clip_id>.ass` (só shorts), `<clip_id>.border.ass` (só cortes), `<clip_id>.thumb.jpg` (miniatura, ambos os formatos) e `metadata.json` — este último é **derivado** de `clips.json` (gerado por `render_clip.py`, regenerado por `upload_clip.py` após publish). Ninguém edita `metadata.json` à mão; subagentes LLM não escrevem nele.
-- Formatos (`core.contracts.FORMAT_RULES`): `short` 15–59s, 1080x1920, sem crop (vídeo numa janela sobre moldura fixa de marca — `core/render/short_frame.py`; substituiu o fundo blur), legendas queimadas; `corte` 480–900s (8–15 min, ≥8 min para monetização), 1920x1080, sem burn.
+- Cada clip tem subpasta própria `video-output/<video_id>/<clip_id>/` com `<clip_id>.mp4`, `<clip_id>.ass` (só shorts), `<clip_id>.border.ass` (só cortes **sem arte PNG** — fallback da moldura gerada), `<clip_id>.thumb.jpg` (miniatura, ambos os formatos) e `metadata.json` — este último é **derivado** de `clips.json` (gerado por `render_clip.py`, regenerado por `upload_clip.py` após publish). Ninguém edita `metadata.json` à mão; subagentes LLM não escrevem nele.
+- Formatos (`core.contracts.FORMAT_RULES`): `short` 15–59s, 1080x1920, sem crop (vídeo numa janela com a arte PNG da conta **por cima** — janela transparente; `core/render/short_frame.py`; substituiu o fundo blur), legendas queimadas; `corte` 480–900s (8–15 min, ≥8 min para monetização), 1920x1080, sem burn (vídeo numa janela com a arte PNG por cima — `core/render/corte_frame.py`; fallback sem PNG: moldura gerada preto+amarelo de `branding.py`). **Compositing:** canvas preto → vídeo na janela → arte PNG por cima → (short) legendas queimadas por último. Toda a marca/CTA vem embutida no PNG.
 
 ## 5. Comandos canônicos
 
