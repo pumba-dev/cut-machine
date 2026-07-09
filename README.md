@@ -148,7 +148,7 @@ flowchart TD
 
 **Formatos** (`core/contracts.py` → `FORMAT_RULES`):
 
-- **short** — 15–59 s, 1080×1920, sem crop. O vídeo entra numa janela transparente da **arte PNG
+- **short** — 30–165 s de conteúdo (alvo média ~60 s; teto reserva ~15 s p/ intro+vinheta → final ≤180 s, teto do Shorts), 1080×1920, sem crop. O vídeo entra numa janela transparente da **arte PNG
   da conta** (que fica *por cima*); legendas ASS queimadas por último.
 - **corte** — 480–900 s (8–15 min; ≥8 min para monetização), 1920×1080, sem legenda queimada.
   Vídeo na janela + arte PNG por cima. Fallback sem PNG: moldura gerada preto+amarelo com CTA.

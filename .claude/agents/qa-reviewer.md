@@ -16,7 +16,7 @@ Você é o revisor de QA técnico do pipeline de cortes. Sua única função: ve
 
 As regras canônicas estão em `core/contracts.py` (`FORMAT_RULES`):
 
-- `short`: resolução EXATA 1080x1920; duração 15–59s; legendas queimadas.
+- `short`: resolução EXATA 1080x1920; duração do conteúdo 30–165s; legendas queimadas.
 - `corte`: resolução EXATA 1920x1080; duração 480–900s (8–15 min).
 
 ## Processo por clip `rendered`

@@ -16,7 +16,7 @@ Roda apenas as fases `plan` + `copy` do pipeline, com checkpoint humano ao final
 
 Spawne o subagente `clip-scout` via Task, informando: workspace (`video-output/<video_id>/`) e a conta de publicacao (`--conta`, ou a conta `"default": true` de `config/accounts.json`). Ele escreve os candidatos em `clips.json` com `status: "planned"`.
 
-Apos o retorno, valide: `clips.json` existe e os clips respeitam os limites de formato (`short` 15-59s, `corte` 480-900s / 8-15 min). Confirme que a etapa `plan` ficou `done` em `state.json`; se o subagente nao marcou, atualize voce mesmo com `python -c` usando `core.state` (load, `set_stage(state, "plan", "done")`, save).
+Apos o retorno, valide: `clips.json` existe e os clips respeitam os limites de formato (`short` 30-165s de conteudo, `corte` 480-900s / 8-15 min). Confirme que a etapa `plan` ficou `done` em `state.json`; se o subagente nao marcou, atualize voce mesmo com `python -c` usando `core.state` (load, `set_stage(state, "plan", "done")`, save).
 
 **Regra inviolavel**: 0 clips com score >= 60 e um resultado valido. Nao invente cortes nem rebaixe criterios — encerre graciosamente com um resumo do porque o video nao rendeu.
 

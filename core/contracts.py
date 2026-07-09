@@ -33,8 +33,11 @@ CTA_FIXA = ("🔥 Curtiu? Deixa o LIKE 👍, comenta o que achou 💬 "
 
 FORMAT_RULES = {
     "short": {
-        "min_duration_s": 15.0,
-        "max_duration_s": 59.0,
+        # Shorts aceita ate 3 min (180s). max e do CONTEUDO (end-start): reserva
+        # ~15s para intro (~0.5s) + vinheta de fim (~10s) => final <=180s. Alvo de
+        # media ~60s; floor de 30s evita shorts pequenos demais (payoff raso).
+        "min_duration_s": 30.0,
+        "max_duration_s": 165.0,
         "resolution": "1080x1920",
         # sem crop: video 16:9 numa janela sobre moldura fixa (short_frame.py)
         "crop": "frame",

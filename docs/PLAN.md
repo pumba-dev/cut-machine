@@ -113,7 +113,7 @@ social-accounts-agent/
 ```
 
 Regras:
-- `format`: `short` → 15–59s, 1080x1920, sem crop (vídeo inteiro sobre fundo blur), legendas queimadas; `corte` → 480–900s (8–15 min, ≥8 min p/ monetização), 1920x1080, sem burn, com moldura de marca preto+amarelo + CTA de inscrição (`branding.py`).
+- `format`: `short` → 30–165s de conteúdo (alvo média ~60s; teto reserva ~15s p/ intro+vinheta → final ≤180s), 1080x1920, sem crop (vídeo inteiro sobre fundo blur), legendas queimadas; `corte` → 480–900s (8–15 min, ≥8 min p/ monetização), 1920x1080, sem burn, com moldura de marca preto+amarelo + CTA de inscrição (`branding.py`).
 - Miniatura (ambos os formatos): `thumbnail_ts` (clip-scout) + `thumbnail_text` (copywriter) → `render.thumbnail_path` (`thumbnail.py`, gerada no render; `thumbnails.set` best-effort no upload).
 - `status`: `planned → approved → rendering → rendered → queued → uploading → published`; desvios `rejected` | `failed` (com `error`). `queued` existe por causa da quota de 6/dia.
 - Rubrica (de references/heuristicas-virais.md): 4 eixos 0–10 × pesos — hook ×3.5, retenção ×3.0, compartilhabilidade ×2.0, clareza ×1.5 = máx 100. Propor só score ≥ 60; veto se clareza ≤ 3. Densidade: 4–8 shorts + 2–4 cortes por hora; zero clips viáveis é resultado válido (terminar graciosamente com relatório).

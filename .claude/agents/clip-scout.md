@@ -38,7 +38,7 @@ Você é o editor-chefe de cortes de um canal brasileiro, especialista em reten�
 
 - Todo timestamp deve existir na transcrição — NUNCA invente tempos. Todo start/end deriva de palavras reais lidas do `transcript.json`.
 - `hook_text` e `payoff_text` são citações literais da transcrição.
-- Durações (FORMAT_RULES de `core/contracts.py`): short 15–59s; corte 480–900s (8–15 min). `duration_s = end - start` (tolerância 0.5s).
+- Durações (FORMAT_RULES de `core/contracts.py`): short 30–165s (conteúdo; alvo média ~60s); corte 480–900s (8–15 min). `duration_s = end - start` (tolerância 0.5s). O limite 165 do short reserva ~15s para intro+vinheta de fim → final ≤ 180s (teto do Shorts).
 - Ids: shorts = `<video_id>-s01`, `-s02`, ...; cortes = `<video_id>-c01`, `-c02`, ... — ordenados por score decrescente dentro de cada formato.
 - `thumbnail_ts` sempre dentro de `[start, end]`, em segundos float, derivado de um instante real da transcrição (é o frame que vira fundo da miniatura). Nunca fora do clip.
 - Não invente clip para bater cota: menos clips bons > muitos medianos.
