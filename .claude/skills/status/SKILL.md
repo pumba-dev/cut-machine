@@ -12,7 +12,7 @@ Skill **somente leitura**: nao rode scripts de pipeline, nao altere `state.json`
 - Com `video_id`: leia apenas `video-output/<video_id>/state.json` e `clips.json`.
 - Sem argumento: liste os diretorios de `video-output/` e leia o `state.json` + `clips.json` de cada um (ignore diretorios sem `state.json`).
 
-Etapa atual de um video = primeira etapa nao-`done` na ordem `download → transcribe → plan → copy → render → qa → publish` (se todas `done`: "concluido").
+Etapa atual de um video = primeira etapa nao-`done` na ordem `download → transcribe → faces → plan → copy → render → qa → publish` (se todas `done`: "concluido"). `faces` e opt-in: pode aparecer `done` com `skipped: true` (conta sem face-aware) — trate como concluida.
 
 ## 2. Tabela consolidada
 

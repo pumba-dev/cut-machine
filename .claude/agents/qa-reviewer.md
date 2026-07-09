@@ -32,10 +32,10 @@ As regras canônicas estão em `core/contracts.py` (`FORMAT_RULES`):
 2. **Checks técnicos** (todos precisam passar):
    - arquivo existe e o probe retorna sem erro;
    - `width`x`height` == resolução exata do formato (`render.target_resolution`) — no `corte`, a moldura de marca **não pode** ter mudado a resolução: ainda deve ser 1920x1080 exatos;
-   - `duration_s` do arquivo == `end - start` do clip, tolerância +-0.5s;
+   - `duration_s` do arquivo == **duração esperada = `end - start` + intro + vinheta de fim** (`render.intro_duration_s` + `render.outro_duration_s`, cada um 0 se ausente), tolerância +-0.5s. O mp4 é propositalmente mais longo que `end - start`: a **intro** é a thumb congelada ~1s colada no INÍCIO dos shorts (capa do feed) e a **vinheta de fim** é colada no fim. **Fonte única — use o helper** (não some à mão): `python -c "from core import contracts, paths; c=contracts.get_clip(contracts.load_plan(paths.clips_path('<video_id>')), '<clip_id>'); print(contracts.expected_output_duration(c))"`;
    - `has_audio` == true.
 
-   **Miniatura (aviso, não bloqueia):** confira se `render.thumbnail_path` existe no clip e se o arquivo `<clip_id>.thumb.jpg` está presente. Se faltar, reporte como aviso na tabela (coluna `thumb`) — a ausência de thumbnail **não** reprova o clip (é enfeite de engajamento, gerado best-effort no render).
+   **Miniatura (aviso, não bloqueia):** confira se `render.thumbnail_path` existe no clip e se o arquivo `<clip_id>.thumb.jpg` está presente. Se faltar, reporte como aviso na tabela (coluna `thumb`) — a ausência de thumbnail **não** reprova o clip (é enfeite de engajamento, gerado best-effort no render). `render.thumbnail_provider` pode ser `local_composite` (default: fundo+recorte+texto local) ou `local` (thumb ASS simples, fallback). `render.thumbnail_composite_error` só indica que o composite caiu pro fallback ASS — **não bloqueia** o clip.
 
 3. **Risco de áudio:** se `clip.audio_risk == true`, rebaixe o clip para `rejected` com `error` explicando (ex.: "transcricao de baixa confianca no trecho (prob media < 0.5); revisar audio antes de publicar") — mesmo que os checks técnicos passem. Publicar clip com legenda potencialmente errada é pior que não publicar.
 

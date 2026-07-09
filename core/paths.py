@@ -49,6 +49,11 @@ def source_info_path(video_id: str) -> Path:
     return workspace_dir(video_id) / "source.info.json"
 
 
+def faces_path(video_id: str) -> Path:
+    """Deteccao de rosto/emocao do source (fase faces, opt-in)."""
+    return workspace_dir(video_id) / "faces.json"
+
+
 def clip_dir(video_id: str, clip_id: str, create: bool = False) -> Path:
     d = workspace_dir(video_id) / clip_id
     if create:

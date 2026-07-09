@@ -9,3 +9,6 @@ __pycache__/
 *.mp4
 *.m4a
 *.webm
+# Vinhetas de fim (assets de marca por conta) — versionadas como as molduras PNG.
+!assets/short-end/*.mp4
+!assets/corte-end/*.mp4

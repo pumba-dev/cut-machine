@@ -92,15 +92,20 @@ def ass_time(t: float) -> str:
     return f"{int(h)}:{int(m):02}:{s:05.2f}"
 
 
-def build_ass(clip: dict, transcript: dict) -> str:
+def build_ass(clip: dict, transcript: dict, speed: float = 1.0) -> str:
     """Gera o conteudo do arquivo .ass para as palavras dentro do clip.
 
     Seleciona palavras com start em [clip.start, clip.end), rebase para o
     t0 do clip e emite eventos Dialogue em CAIXA ALTA, um estilo por
     falante.
+
+    `speed` (core.render.transform): quando o video e acelerado por `setpts`
+    (speed != 1.0), os tempos rebased sao divididos por `speed` para a legenda
+    acompanhar o video. speed=1.0 (default) e no-op.
     """
     start = clip["start"]
     end = clip["end"]
+    sp = speed if speed and speed > 0 else 1.0
     words = [
         w
         for seg in transcript["segments"]
@@ -109,8 +114,8 @@ def build_ass(clip: dict, transcript: dict) -> str:
     ]
     events: list[str] = []
     for group in group_words(words):
-        ev_start = ass_time(group[0]["start"] - start)
-        ev_end = ass_time(min(group[-1]["end"], end) - start)
+        ev_start = ass_time((group[0]["start"] - start) / sp)
+        ev_end = ass_time((min(group[-1]["end"], end) - start) / sp)
         style = _style_for(group[0].get("spk"))
         text = " ".join(w["w"] for w in group).upper()
         events.append(f"Dialogue: 0,{ev_start},{ev_end},{style},,0,0,0,,{text}")

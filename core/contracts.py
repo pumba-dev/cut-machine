@@ -2,7 +2,8 @@
 
 Donos por campo — ninguem sobrescreve campo de outro dono:
 - clip-scout (LLM): objeto do clip + campos de analise (start/end, hook_text, score...)
-- copywriter (LLM): title, title_alts, description, tags
+- copywriter (LLM): title, title_alts, description, tags, thumbnail_text
+- thumbnail-director (LLM, opt-in): bloco thumbnail_plan (frame/rosto/layout/prompt da IA)
 - render_clip.py: bloco render.*
 - qa-reviewer: bloco qa.* (qa.status pass/fail) + transicao failed/rejected
 - upload_clip.py: bloco publish.* (remote_id, url, published_at)
@@ -115,6 +116,28 @@ def set_clip_qa(clip: dict, status: str, note: str | None = None) -> dict:
         raise ValueError(f"qa status invalido: {status}")
     clip["qa"] = {"status": status, "note": note}
     return clip
+
+
+def expected_output_duration(clip: dict) -> float:
+    """Duracao esperada do mp4 final = intro + conteudo (end-start) + vinheta de fim.
+
+    O render pode prepender uma intro (thumb congelada ~1s, so shorts opt-in;
+    `render.intro_duration_s`) e/ou colar uma vinheta de fim (outro;
+    `render.outro_duration_s`), ambas fora do check de conteudo. O arquivo final
+    e mais longo que `end - start` pela soma das duas. Fonte unica para os checks
+    de duracao (qa_backfill, qa-reviewer): comparam a duracao probeda contra este
+    valor (+-0.5s). Cada extra so entra quando de fato aplicado (campo gravado);
+    ausente -> 0 (retrocompativel com clips antigos)."""
+    base = float(clip["end"]) - float(clip["start"])
+    render = clip.get("render") or {}
+
+    def _f(x) -> float:
+        try:
+            return float(x or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return base + _f(render.get("intro_duration_s")) + _f(render.get("outro_duration_s"))
 
 
 def tags_budget_len(tags: list[str]) -> int:

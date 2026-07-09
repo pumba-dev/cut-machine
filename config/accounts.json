@@ -11,16 +11,30 @@
       "default": true,
       "daily_upload_limit": 100,
       "brand": {
-        "border_text": "Curta e se inscreva no canal",
-        "border_color": "#000000",
-        "accent_color": "#FFD93D",
         "short_frame": "assets/short-frame/principal.png",
-        "short_bg_color": "#111111",
-        "corte_frame": "assets/corte-frame/principal.png"
+        "corte_frame": "assets/corte-frame/principal.png",
+        "short_outro": "assets/short-end/principal.mp4",
+        "corte_outro": "assets/corte-end/principal.mp4"
+      },
+      "transform": {
+        "speed": 1.02,
+        "pitch_semitones": 0.3,
+        "eq": true,
+        "music_dir": "assets/music/principal",
+        "music_volume": 0.05,
+        "music_lufs": -16,
+        "color": { "contrast": 1.05, "saturation": 1.1, "gamma": 0.98 },
+        "zoom": 1.2,
+        "jitter": 0.35
+      },
+      "thumbnail": {
+        "face_aware": true,
+        "intro_short": true,
+        "intro_duration_s": 1.0,
+        "rembg_model": "u2net"
       },
       "default_hashtags": [
         "#política",
-        "#mbl",
         "#eleicoes2026",
         "#direita",
         "#renansantos",

@@ -34,7 +34,7 @@ Spawne o subagente `qa-reviewer` via Task com o workspace. Ele roda ffprobe em c
 
 - short: 1080x1920, duracao 15-59s, legendas queimadas;
 - corte: 1920x1080, 480-900s (8-15 min);
-- audio presente; duracao real ~ `end - start` (tolerancia 0.5s).
+- audio presente; duracao real ~ `contracts.expected_output_duration` = `(end - start) + intro + vinheta de fim` (`render.intro_duration_s` da capa ~1s do short + `render.outro_duration_s`, cada um 0 se ausente), tolerancia 0.5s.
 
 Clips reprovados ficam `failed` com `error` preenchido em `clips.json`. Ao final, marque a etapa `qa` como `done` em `state.json` — subagentes nao mexem em `state.json`: `python -c` com `core.state` (load, `set_stage(st, "qa", "done")`, save).
 

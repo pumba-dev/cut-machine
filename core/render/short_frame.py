@@ -38,7 +38,8 @@ WINDOW = (20, 656, 1040, 608)
 BG_FALLBACK = "#111111"
 
 
-def build_short_filter(bg_hex: str, has_png: bool, captions_ass_name: str) -> str:
+def build_short_filter(bg_hex: str, has_png: bool, captions_ass_name: str,
+                       vfx: str = "") -> str:
     """filter_complex do short -> label [v]. Nome do .ass relativo ao cwd.
 
     Encaixa o video (SEM crop) dentro de WINDOW, centralizado sobre um canvas; a
@@ -46,12 +47,16 @@ def build_short_filter(bg_hex: str, has_png: bool, captions_ass_name: str) -> st
     deixa o video aparecer). As legendas sao queimadas por ULTIMO. O
     `overlay=...:shortest=1` do video limita a saida a sua duracao (canvas/PNG
     sao fontes infinitas). Toda a marca ja vem embutida na arte PNG.
+
+    `vfx` (core.render.transform.video_filters) e um fragmento opcional de
+    filtros de video (speed/zoom/cor) inserido ANTES do scale para a janela —
+    terminado em virgula ou "". Zoom por crop-in nao muda a resolucao final.
     """
     wx, wy, ww, wh = WINDOW
     # setpts=PTS-STARTPTS: zera o PTS do video (seek `-ss` deixa o 1o frame com
     # PTS > 0) para alinhar com o canvas/PNG (fontes em t=0) — sem isso o overlay
     # so mostra o canvas ate o video chegar (abertura preta).
-    fg = (f"[0:v]setpts=PTS-STARTPTS,scale={ww}:{wh}:force_original_aspect_ratio=decrease,"
+    fg = (f"[0:v]setpts=PTS-STARTPTS,{vfx}scale={ww}:{wh}:force_original_aspect_ratio=decrease,"
           "scale=trunc(iw/2)*2:trunc(ih/2)*2[fg];")
     ov = f"[canvas][fg]overlay=x={wx}+({ww}-w)/2:y={wy}+({wh}-h)/2:shortest=1"
     if has_png:

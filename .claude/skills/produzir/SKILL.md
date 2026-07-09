@@ -10,7 +10,7 @@ Voce e o orquestrador: delega analise criativa a subagentes (Task) e execucao de
 - A **ultima linha do stdout** de todo script e uma linha JSON `{"ok": ...}`. Leia-a para decidir o proximo passo. `{"ok": true, "skipped": true}` = etapa ja estava feita.
 - **Nunca refaca etapa `done`** — os scripts ja checam `state.json` e pulam sozinhos.
 - Se um script falhar (`ok: false` ou exit != 0): leia stderr e `state.json.last_error`, tente 1 correcao obvia (ex.: re-rodar), senao pare e reporte ao usuario.
-- Ordem das etapas em `state.json.stages`: `download → transcribe → plan → copy → render → qa → publish`.
+- Ordem das etapas em `state.json.stages`: `download → transcribe → faces → plan → copy → render → qa → publish` (`faces` é opt-in; o script se auto-pula se a conta não usa).
 - `--conta` define a conta de publicacao (default: conta com `"default": true` em `config/accounts.json`). Repasse-a ao clip-scout e ao publisher.
 
 ## 1. Retomada
@@ -19,14 +19,17 @@ Voce e o orquestrador: delega analise criativa a subagentes (Task) e execucao de
 2. Se `video-output/<video_id>/state.json` **existe**: leia-o, identifique a primeira etapa nao-`done` e **avise o usuario** ("retomando <video_id> a partir da etapa X"). Pule direto para o passo correspondente abaixo. Etapa `running` orfa (processo morreu): re-rode o script — ele e idempotente e verifica os artefatos.
 3. Se nao existe: pipeline completo desde o inicio.
 
-## 2. Download e transcricao
+## 2. Download, transcricao e rostos
 
 ```
 python scripts/download.py --url <URL>
 python scripts/transcribe.py --video-id <video_id>
+python scripts/analyze_faces.py --video-id <video_id> [--account <conta>]
 ```
 
 Sequencial (transcribe depende de `source.mp4`). Nao passe `--model/--device/--compute` a menos que o usuario peca — os defaults ja sao os corretos para a GPU local.
+
+`analyze_faces.py` e a fase **`faces`** (opt-in): detecta rosto/emocao no source (CPU, minutos) e escreve `faces.json`. Sempre pode ser chamado — se a conta nao tem `thumbnail.face_aware`, ele retorna `{"skipped": true}` (no-op); se a deteccao falhar, degrada (`degraded: true`) e o pipeline segue com a thumb ASS local. Nao bloqueia nada.
 
 ## 3. Planejamento (clip-scout)
 
@@ -47,6 +50,12 @@ python scripts/validate_plan.py --video-id <video_id>
 ```
 
 A ultima linha e um JSON `{ok, errors, warnings, clips_com_copy}`. Se houver `errors`: re-spawne o copywriter **1 vez** com os erros no prompt e re-valide (e a regra de max 1 retry); se persistirem, pare e reporte. `warnings` nao bloqueiam — guarde-os para listar no checkpoint. Por fim, marque `copy` como `done` em `state.json` (mesmo procedimento da etapa plan).
+
+### 4.1 Miniatura inteligente (opcional — thumbnail-director)
+
+**Quando rodar:** a conta tem `thumbnail.face_aware` e `video-output/<video_id>/faces.json` existe sem `"degraded": true`. É **opcional** — melhora a escolha de frame/rosto/layout da thumb. Se pular, o render monta a thumb do mesmo jeito (composite local), só que escolhendo o frame/rosto no automático (`thumbnail_ts` + host do `faces.json`).
+
+Spawne o subagente `thumbnail-director` via Task com o workspace + `account_id`. Ele lê `faces.json` + `thumbnail_text` e escreve `thumbnail_plan` (frame_ts, rosto/host, layout) nos clips `planned`. Sem etapa em `state.json` — o artefato durável é o `thumbnail_plan` em `clips.json` (idempotente por presença). O render (passo 6) usa `frame_ts`/`identity`/`layout` na **thumb compositada local**.
 
 ## 5. CHECKPOINT humano 1 — aprovacao dos cortes
 

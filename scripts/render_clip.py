@@ -155,15 +155,24 @@ def main() -> None:
         render_block["output_path"] = _output_rel(video_id, cid)
         render_block["rendered_at"] = _now()
         render_block["actual_duration_s"] = round(info["duration_s"], 3)
+        if info.get("intro_duration_s") is not None:
+            render_block["intro_duration_s"] = info["intro_duration_s"]
+        if info.get("outro_duration_s") is not None:
+            render_block["outro_duration_s"] = info["outro_duration_s"]
+        if info.get("transform"):
+            render_block["transform"] = info["transform"]
         if info.get("thumbnail_path") is not None:
             render_block["thumbnail_path"] = _rel(info["thumbnail_path"])
             render_block["thumbnail_ts"] = round(float(info["thumbnail_ts"]), 3)
+            render_block["thumbnail_provider"] = info.get("thumbnail_provider", "local")
         contracts.set_clip_status(clip, "rendered")
         contracts.save_plan(clips_file, plan)
         result = {"clip_id": cid, "status": "rendered",
                   "output": render_block["output_path"]}
-        if info.get("thumbnail_error"):
-            result["thumbnail_error"] = info["thumbnail_error"]
+        # Erros best-effort (miniatura/composite/intro): reportados, nunca reprovam.
+        for key in ("thumbnail_error", "thumbnail_composite_error", "intro_error"):
+            if info.get(key):
+                result[key] = info[key]
         meta_err = _save_metadata(video_id, plan, clip)
         if meta_err:
             result["metadata_error"] = meta_err

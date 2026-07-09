@@ -7,3 +7,10 @@ nvidia-cudnn-cu12>=9.1,<10
 google-api-python-client>=2.170.0
 google-auth-oauthlib>=1.2.2
 google-auth-httplib2>=0.2.0
+# Miniatura inteligente (opt-in): deteccao de rosto/emocao (fase faces) +
+# thumb compositada local (recorte da pessoa + fundo + texto). CPU-only (nunca
+# onnxruntime-gpu: evita disputar os 6GB da GPU do whisper/render).
+opencv-python-headless>=4.9
+Pillow>=10
+numpy>=1.26
+rembg[cpu]>=2.0

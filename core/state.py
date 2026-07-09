@@ -9,7 +9,11 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-STAGES = ("download", "transcribe", "plan", "copy", "render", "qa", "publish")
+# `faces` (opt-in) roda apos transcribe: deteccao de rosto/emocao no source
+# (faces.json), insumo do thumbnail-director e da thumb via IA. Conta sem
+# `thumbnail.face_aware` -> a fase e um no-op (emit skipped), estado fica pending
+# mas nada bloqueia o pipeline.
+STAGES = ("download", "transcribe", "faces", "plan", "copy", "render", "qa", "publish")
 STAGE_STATUSES = ("pending", "running", "partial", "done", "failed")
 
 

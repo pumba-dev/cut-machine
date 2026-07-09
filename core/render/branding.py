@@ -37,6 +37,10 @@ BRAND_DEFAULTS = {
     # Moldura fixa do corte (core/render/corte_frame.py): idem, arte 16:9. Vazio
     # = fallback para a moldura GERADA (padding + rim + faixa de texto ASS).
     "corte_frame": "",                  # path do PNG (rel. a raiz do repo)
+    # Vinheta de fim (core/render/outro.py): mp4 colado ao final do clip apos o
+    # render+validacao. Vazio = sem vinheta (retrocompativel). Path rel. a raiz.
+    "short_outro": "",                  # mp4 de encerramento do short (9:16)
+    "corte_outro": "",                  # mp4 de encerramento do corte (16:9)
 }
 
 
@@ -75,15 +79,21 @@ def ass_color(color: str) -> str:
     return f"&H00{b:02X}{g:02X}{r:02X}"
 
 
-def build_corte_filter(brand: dict, border_ass_name: str) -> str:
+def build_corte_filter(brand: dict, border_ass_name: str, vfx: str = "") -> str:
     """filter_complex da moldura do corte -> label [v].
 
     border_ass_name deve ser relativo ao cwd do ffmpeg (pasta do clip).
+
+    `vfx` (core.render.transform.video_filters) e um fragmento opcional de
+    filtros de video (speed/zoom/cor) — terminado em virgula ou "". Quando
+    presente, injeta antes um `setpts=PTS-STARTPTS` (o seek `-ss` deixa o 1o
+    frame com PTS > 0; o `setpts=PTS/speed` do vfx exige base zerada).
     """
     bg = ff_color(brand["border_color"])
     accent = ff_color(brand["accent_color"])
+    prefix = f"setpts=PTS-STARTPTS,{vfx}" if vfx else ""
     return (
-        f"[0:v]scale={_INNER_W}:{_INNER_H}:force_original_aspect_ratio=decrease,"
+        f"[0:v]{prefix}scale={_INNER_W}:{_INNER_H}:force_original_aspect_ratio=decrease,"
         "scale=trunc(iw/2)*2:trunc(ih/2)*2,"
         f"pad={CANVAS_W}:{CANVAS_H}:(ow-iw)/2:{TOP}:color={bg},"
         f"drawbox=x=0:y=0:w={CANVAS_W}:h={CANVAS_H}:color={accent}:t={RIM},"

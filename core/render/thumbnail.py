@@ -25,11 +25,13 @@ _WHITE = "&H00FFFFFF"
 
 # Tamanhos/paddings por formato (relativos ao PlayRes da miniatura).
 # impact = frase amarela grande no topo; hook = chip de gancho na faixa inferior.
+# corte usa layout LATERAL (impacto+chips na metade da largura): fonte menor que
+# o short p/ o impacto longo caber em poucas linhas sem colidir com os chips.
 _FONT_SIZES = {
-    "corte": {"impact": 100, "hook": 44, "imp_out": 6, "chip_pad": 11},
-    "short": {"impact": 148, "hook": 60, "imp_out": 9, "chip_pad": 16},
+    "corte": {"impact": 96, "hook": 46, "imp_out": 7, "chip_pad": 13},
+    "short": {"impact": 220, "hook": 90, "imp_out": 13, "chip_pad": 24},
 }
-_DEFAULT_SIZES = {"impact": 118, "hook": 52, "imp_out": 7, "chip_pad": 13}
+_DEFAULT_SIZES = {"impact": 170, "hook": 76, "imp_out": 10, "chip_pad": 18}
 
 
 def _t(value: float) -> str:
@@ -86,7 +88,7 @@ def _ass_escape(text: str) -> str:
     return (text or "").replace("\\", "").replace("{", "(").replace("}", ")")
 
 
-def build_thumb_ass(clip: dict, width: int, height: int) -> str:
+def build_thumb_ass(clip: dict, width: int, height: int, region: str = "full") -> str:
     """.ass da miniatura (PlayRes = resolucao da thumb).
 
     Layout (revisado 2026-07-08): frase de IMPACTO amarela GRANDE no topo
@@ -95,19 +97,35 @@ def build_thumb_ass(clip: dict, width: int, height: int) -> str:
     em Dialogue proprio com BorderStyle=3 (caixa opaca), cores ALTERNANDO
     preto/amarelo e folga vertical entre eles, para o usuario ler 3 frases
     SEPARADAS e longe da frase principal (nao mais um bloco unico embaixo dela).
+
+    `region` confina o texto a uma COLUNA (layout lateral do corte 16:9): "left"
+    = impacto+chips na metade esquerda (sujeito na direita), "right" = espelho,
+    "full" (default) = comportamento classico (centro, topo/base).
     """
     fmt = clip.get("format")
     s = _FONT_SIZES.get(fmt, _DEFAULT_SIZES)
     impact, hooks = _content(clip)
+    if region != "full":  # layout lateral (corte): coluna estreita -> so 2 chips
+        hooks = hooks[:2]
     impact_fs, hook_fs = s["impact"], s["hook"]
     imp_out, chip_pad = s["imp_out"], s["chip_pad"]
     top_margin = round(height * 0.035)
 
-    # Impacto: topo-centro, contorno preto grosso (BorderStyle=1) + sombra leve.
+    # Coluna do texto conforme a region (para o layout lateral do corte). Chips
+    # ANCORADOS na borda da coluna (an4/an6), nao centrados: frase longa cresce
+    # p/ dentro sem clipar na borda (centrado, chip largo estourava a lateral).
+    if region == "left":
+        imp_ml, imp_mr, chip_an, chip_x = 40, round(width * 0.40), 4, 40
+    elif region == "right":
+        imp_ml, imp_mr, chip_an, chip_x = round(width * 0.40), 40, 6, width - 40
+    else:
+        imp_ml, imp_mr, chip_an, chip_x = 40, 40, 5, round(width / 2)
+
+    # Impacto: topo-centro (da coluna), contorno preto grosso + sombra leve.
     impact_style = (
         f"Style: Impact,Arial Black,{impact_fs},{_ACCENT},{_WHITE},{_BLACK},"
         f"&H64000000,-1,0,0,0,100,100,0,0,1,{imp_out},{max(2, imp_out // 3)},"
-        f"8,40,40,{top_margin},1"
+        f"8,{imp_ml},{imp_mr},{top_margin},1"
     )
     # Ganchos: chip com caixa (BorderStyle=3); cor da caixa/texto vem inline.
     hook_style = (
@@ -120,13 +138,12 @@ def build_thumb_ass(clip: dict, width: int, height: int) -> str:
     ]
     n = len(hooks)
     if n:
-        cx = round(width / 2)
         step = round(hook_fs * 2.2)
-        band_bottom = round(height * 0.92)
+        band_bottom = round(height * (0.90 if region != "full" else 0.92))
         for i, h in enumerate(hooks):
             y = band_bottom - (n - 1 - i) * step
             box, txt = (_BLACK, _ACCENT) if i % 2 == 0 else (_ACCENT, _BLACK)
-            tag = (f"{{\\pos({cx},{y})\\an5\\1c{txt}\\3c{box}"
+            tag = (f"{{\\pos({chip_x},{y})\\an{chip_an}\\1c{txt}\\3c{box}"
                    f"\\bord{chip_pad}\\b1}}")
             events.append(
                 f"Dialogue: 0,0:00:00.00,0:00:10.00,Hook,,0,0,0,,{tag}{_ass_escape(h)}"

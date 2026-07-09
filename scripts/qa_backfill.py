@@ -46,10 +46,10 @@ def _check(clip: dict, mp4: Path) -> tuple[str, str | None]:
         return "failed", (f"resolucao {info['width']}x{info['height']}, "
                           f"esperado {rules['resolution']}")
 
-    expected = float(clip["end"]) - float(clip["start"])
+    expected = contracts.expected_output_duration(clip)
     if abs(info["duration_s"] - expected) > 0.5:
         return "failed", (f"duracao {info['duration_s']:.2f}s vs esperada "
-                          f"{expected:.2f}s (tolerancia 0.5s)")
+                          f"{expected:.2f}s (conteudo + vinheta, tolerancia 0.5s)")
 
     if not info["has_audio"]:
         return "failed", "sem stream de audio"
