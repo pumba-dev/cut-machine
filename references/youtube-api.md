@@ -78,7 +78,7 @@ O YouTube bloqueia downloads sem sessão em muitos IPs residenciais. Constatado 
 
 ## Multi-conta
 
-Cada conta é uma entrada em `config/accounts.json` com diretório de credenciais isolado. Para adicionar uma segunda conta YouTube:
+Cada conta é uma entrada em `config/accounts.json` com diretório de credenciais isolado. Pra adicionar um canal novo, use a skill `/adicionar-canal` (`.claude/skills/adicionar-canal/SKILL.md`) — cobre checklist do canal, GCP/OAuth, template completo de `accounts.json` (todos os blocos, não só os campos mínimos abaixo), assets de marca e decisão de cron. Resumo rápido:
 
 1. Editar `config/accounts.json`:
 

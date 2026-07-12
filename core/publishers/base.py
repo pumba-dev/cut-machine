@@ -41,6 +41,12 @@ class Publisher(ABC):
         - language: str (ex.: "pt-BR")
         - thumbnail_path: str | None (opcional; miniatura para thumbnails.set
           best-effort — falha nao derruba o upload)
+        - format: str | None ("short"/"corte"; usado para decidir se espera
+          o processamento (poll) antes do thumbnails.set em Shorts
+          recem-publicados)
+
+        Retorno tambem pode incluir "thumbnail_set": bool quando
+        thumbnail_path foi passado.
 
         Lanca QuotaExceededError quando a quota diaria da API esgotar.
         """

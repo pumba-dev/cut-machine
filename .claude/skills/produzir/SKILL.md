@@ -11,7 +11,7 @@ Voce e o orquestrador: delega analise criativa a subagentes (Task) e execucao de
 - **Nunca refaca etapa `done`** — os scripts ja checam `state.json` e pulam sozinhos.
 - Se um script falhar (`ok: false` ou exit != 0): leia stderr e `state.json.last_error`, tente 1 correcao obvia (ex.: re-rodar), senao pare e reporte ao usuario.
 - Ordem das etapas em `state.json.stages`: `download → transcribe → faces → plan → copy → render → qa → publish` (`faces` é opt-in; o script se auto-pula se a conta não usa).
-- `--conta` define a conta de publicacao (default: conta com `"default": true` em `config/accounts.json`). Repasse-a ao clip-scout e ao publisher.
+- **`--conta <id>` e OBRIGATORIA** (define o brand do render, o nicho da copy e o canal do upload). Se o usuario NAO passar, **PARE e pergunte qual canal** — nunca assuma o default. Canais atuais em `config/accounts.json` (e na lista do `CLAUDE.md` §8); o id tem que existir la. Repasse a conta ao clip-scout, ao copywriter e ao publisher.
 
 ## 1. Retomada
 
@@ -33,7 +33,7 @@ Sequencial (transcribe depende de `source.mp4`). Nao passe `--model/--device/--c
 
 ## 3. Planejamento (clip-scout)
 
-Spawne o subagente `clip-scout` via Task, informando no prompt: o workspace (`video-output/<video_id>/`) e a conta de publicacao resolvida. Ele le `transcript.compact.json` + `references/` e escreve os candidatos em `clips.json` com `status: "planned"`.
+Spawne o subagente `clip-scout` via Task, informando no prompt: o workspace (`video-output/<video_id>/`) e a conta de publicacao (a do `--conta`, **obrigatoria — sem default**). Ele le `transcript.compact.json` + `references/` e escreve os candidatos em `clips.json` com `status: "planned"` (e grava a conta em `publish.account`).
 
 **Regra inviolavel**: se o clip-scout voltar com **0 clips de score >= 60, isso e um resultado valido**. Nao invente cortes, nao rebaixe criterios, nao re-rode "para tentar de novo". Encerre graciosamente com o relatorio final explicando que o video nao rendeu cortes acima do corte de qualidade.
 
@@ -41,7 +41,7 @@ Apos validar o retorno (clips.json existe e respeita FORMAT_RULES), marque a eta
 
 ## 4. Copy (copywriter)
 
-Spawne o subagente `copywriter` via Task com o mesmo workspace e o `account_id` da conta alvo (`--conta` ou a default de `config/accounts.json`). Ele preenche `title`, `title_alts`, `description`, `tags` dos clips `planned` em `clips.json`, seguindo `references/padrao-copy.md` e a identidade do canal (`channel_name`, `niche`, `default_hashtags` da conta).
+Spawne o subagente `copywriter` via Task com o mesmo workspace e o `account_id` da conta alvo (o do `--conta`; **sem default**). Ele preenche `title`, `title_alts`, `description`, `tags` dos clips `planned` em `clips.json`, seguindo `references/padrao-copy.md` (universal) **+ `references/copy/<copy_profile>.md`** (nicho da conta) e a identidade do canal (`channel_name`, `niche`, `default_hashtags`).
 
 Depois, valide a copy:
 

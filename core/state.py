@@ -13,7 +13,11 @@ from pathlib import Path
 # (faces.json), insumo do thumbnail-director e da thumb via IA. Conta sem
 # `thumbnail.face_aware` -> a fase e um no-op (emit skipped), estado fica pending
 # mas nada bloqueia o pipeline.
-STAGES = ("download", "transcribe", "faces", "plan", "copy", "render", "qa", "publish")
+# `speaker-track` (opt-in) roda apos faces: rastreio do falante ativo por tempo
+# (AV-sync boca x audio, core.faces.speaker_track), insumo do reframe dinamico
+# do render. Conta sem bloco `reframe` -> no-op (skipped), sem bloquear o pipeline.
+STAGES = ("download", "transcribe", "faces", "speaker-track", "plan", "copy",
+         "render", "qa", "publish")
 STAGE_STATUSES = ("pending", "running", "partial", "done", "failed")
 
 

@@ -17,10 +17,18 @@ Etapa atual de um video = primeira etapa nao-`done` na ordem `download → trans
 ## 2. Tabela consolidada
 
 ```
-video | titulo | etapa atual | clips por status
+video | titulo | shorts publicados | shorts pendentes | cortes publicados | cortes pendentes | na fila pra publicar
 ```
 
-Em "clips por status", agregue `clips.json.clips[].status`, ex.: `3 published, 1 queued, 1 rejected`. Video sem `clips.json` ainda: `-`. Com `video_id` unico, mostre tambem o detalhe clip a clip: id | formato | status | score | titulo | url (quando publicado).
+Agregue `clips.json.clips[].status` **separado por `format`** (`short` vs `corte`) em dois baldes:
+- **publicados** = `status == "published"` (numero).
+- **pendentes** = qualquer outro status (`planned/approved/rendering/rendered/queued/uploading`, tambem `failed`/`rejected` — mas marque esses com sufixo, ex. `c3(rejected)`) — numero **+ lista dos ids** (sufixo curto, sem prefixo do video e sem zero a esquerda: `GaD5LydtZ6g-c02` -> `c2`, `-s01` -> `s1`). Formato da celula: `2 (c2, c3)`. Zero pendentes: `0`.
+
+**Na fila pra publicar** (coluna extra — o balde de pendentes acima nao diz quais ja podem sair, so quantos faltam em qualquer etapa): short+corte somados com `status == "rendered"` **e** `qa.status == "pass"` (o que `publish_next.py` de fato pega, ver CLAUDE.md). Numero + ids (mesmo formato do balde de pendentes: `2 (c2, s3)`). Zero: `0`.
+
+Video sem `clips.json` ainda: `-` nas cinco colunas. Video arquivado (pasta limpa, so existe `video-output/_archive/<video_id>.clips.json`): inclua na tabela normalmente, marcando o nome do video com `(arquivado)` — pendentes e fila ali deveria ser sempre `0` (cleanup so roda com tudo terminal).
+
+Com `video_id` unico, mostre tambem o detalhe clip a clip: id | formato | status | score | titulo | url (quando publicado).
 
 ## 3. Alertas
 

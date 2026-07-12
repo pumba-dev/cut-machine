@@ -54,6 +54,12 @@ def faces_path(video_id: str) -> Path:
     return workspace_dir(video_id) / "faces.json"
 
 
+def speaker_track_path(video_id: str) -> Path:
+    """Rastreio do falante ativo por tempo, AV-sync boca x audio (fase
+    speaker-track, opt-in; core.faces.speaker_track)."""
+    return workspace_dir(video_id) / "speaker_track.json"
+
+
 def clip_dir(video_id: str, clip_id: str, create: bool = False) -> Path:
     d = workspace_dir(video_id) / clip_id
     if create:

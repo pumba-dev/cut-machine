@@ -3,7 +3,7 @@
 Referência para o subagente planejador de cortes (clip-scout). Aplica-se a transcrições com timestamps word-level.
 Contexto de plataforma (2025/2026): Shorts aceita até 3 min (180s, vídeo vertical). O corte agora explora essa faixa mais longa (alvo média ~60s), não os 20–45s de antes — clip curto demais entrega payoff raso. Ainda assim, 50–60% do drop-off acontece nos primeiros 3 segundos; a meta é reter >70% após o 3º segundo. #shorts não é mais obrigatório para classificação (duração + aspect ratio decidem), mas ainda ajuda em busca.
 
-Nomenclatura de formato (a mesma de `core/contracts.py`): **`short`** = vertical 9:16, 1080x1920, 30–165s de conteúdo (alvo média ~60s; teto 165 reserva ~15s p/ intro+vinheta → final ≤180s), legendas queimadas; **`corte`** = horizontal 16:9, 1920x1080, 8–15 min (480–900s), sem legenda queimada.
+Nomenclatura de formato (a mesma de `core/contracts.py`): **`short`** = vertical 9:16, 1080x1920, 30–165s de conteúdo (alvo média ~60s; teto 165 reserva ~15s p/ intro+vinheta → final ≤180s), legendas queimadas; **`corte`** = horizontal 16:9, 1920x1080, 8–10 min (480–600s), sem legenda queimada.
 
 ## 1. Sinais de momento virável (detectáveis na transcrição)
 
@@ -41,14 +41,14 @@ Score = soma ponderada de 4 eixos. Avaliar cada eixo de 0–10 e multiplicar pel
 - **Ideal: 45–90s, alvo média ~60s. Limites duros do conteúdo: 30–165s.** Abaixo de 30s o payoff fica raso (era a causa dos shorts pequenos demais); o teto de 165s reserva ~15s p/ intro+vinheta de fim → final ≤180s (teto do Shorts). Passar de ~90s exige retenção excepcional.
 - Escolher `short` quando: o momento é UMA ideia só (1 história, 1 opinião, 1 dica) OU um mini-arco coeso que sustenta até ~90s; o pico emocional/payoff cabe no clip sem enrolação. Sem crop: o render encaixa o vídeo original inteiro numa janela sobre uma moldura fixa de marca, então não depende de talking-head centralizado — tela/slides largos aparecem inteiros.
 
-### `corte` (16:9, 8–15 min)
-- **Ideal: 10–13 min. Limites duros: 8–15 min (480–900s).**
+### `corte` (16:9, 8–10 min)
+- **Ideal: 9–10 min. Limites duros: 8–10 min (480–600s).**
 - **Preferência forte por ≥8 min (monetização):** o YouTube só habilita mid-roll ads em vídeos ≥8 min, então o `corte` existe para gerar receita — priorize fechar blocos que atinjam esse patamar. Corte abaixo de 8 min **não é aceito** (reprova em `FORMAT_RULES`); se o material coeso não chega a 8 min, prefira estender o recorte (mais contexto/mais picos no mesmo tema) a propor um corte curto.
-- Escolher `corte` quando: o assunto sustenta 8–15 min de desenvolvimento (debate, explicação em camadas, história longa); há múltiplos picos encadeados no mesmo tema; o valor está na argumentação, não numa frase.
+- Escolher `corte` quando: o assunto sustenta 8–10 min de desenvolvimento (debate, explicação em camadas, história longa); há múltiplos picos encadeados no mesmo tema; o valor está na argumentação, não numa frase.
 
 ### Regra de decisão para um mesmo momento
 1. O payoff cabe em ≤~90s a partir do hook (alvo ~60s)? → **`short`.**
-2. Não cabe, mas o bloco temático completo sustenta 8–15 min com ≥3 picos encadeados? → **`corte`.** (Se o tema só rende 3–7 min, não force um corte curto: extraia o(s) `short`(s) do(s) pico(s) ou junte blocos adjacentes até ≥8 min.)
+2. Não cabe, mas o bloco temático completo sustenta 8–10 min com ≥3 picos encadeados? → **`corte`.** (Se o tema só rende 3–7 min, não force um corte curto: extraia o(s) `short`(s) do(s) pico(s) ou junte blocos adjacentes até ≥8 min.)
 3. Momento excepcional (score ≥ 85) que funciona nos dois? → **Propor ambos**: `short` com o pico + `corte` com o contexto completo ≥8 min (o short vira funil para o corte).
 
 ## 4. Ajuste fino de início e fim (timestamps)

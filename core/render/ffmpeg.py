@@ -17,10 +17,17 @@ from .captions import build_ass
 from .corte_frame import BG_FALLBACK as CORTE_BG_FALLBACK
 from .corte_frame import build_corte_frame_filter
 from .intro import prepend_intro
+from . import jumpcut
+from .jumpcut_config import jumpcut_enabled, resolve_jumpcut
 from .outro import append_outro
+from . import reframe
+from .reframe import resolve_crop_segments
+from .reframe_config import reframe_enabled, resolve_reframe
+from . import sfx as sfx_mod
 from .short_frame import BG_FALLBACK, build_short_filter
 from .thumbnail import generate_thumbnail
 from .thumbnail_config import composite_enabled, intro_enabled, resolve_thumbnail
+from .timemap import TimeMap
 from .transform import (
     audio_active,
     build_audio_graph,
@@ -56,7 +63,10 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
                     frame_png: str | None = None, bg_hex: str = BG_FALLBACK,
                     vfx: str = "", audio_graph: str = "",
                     music_path: str | None = None,
-                    dur_read: float | None = None) -> list[str]:
+                    dur_read: float | None = None,
+                    crop_segments: list[dict] | None = None,
+                    accent_hex: str = "#FFD93D",
+                    sfx_path: str | None = None) -> list[str]:
     """Comando ffmpeg para short 1080x1920 com moldura fixa + legendas queimadas.
 
     Fundo ESTATICO (nao mais blur): arte PNG decorativa da conta (`frame_png`,
@@ -80,7 +90,9 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
     SAIDA fica travada em `dur` — mantendo a duracao invariante sob speed.
     """
     has_png = bool(frame_png)
-    filter_complex = build_short_filter(bg_hex, has_png, captions_ass, vfx=vfx)
+    filter_complex = build_short_filter(bg_hex, has_png, captions_ass, vfx=vfx,
+                                        crop_segments=crop_segments, dur=dur,
+                                        accent_hex=accent_hex)
     if audio_graph:
         filter_complex = filter_complex + ";" + audio_graph
     read = dur if dur_read is None else dur_read
@@ -89,6 +101,8 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
         cmd += ["-loop", "1", "-i", frame_png]
     if music_path:
         cmd += ["-stream_loop", "-1", "-i", music_path]
+    if sfx_path:
+        cmd += ["-i", sfx_path]
     cmd += [
         "-filter_complex", filter_complex,
         "-map", "[v]", "-map", ("[aout]" if audio_graph else "0:a?"),
@@ -108,7 +122,8 @@ def build_corte_cmd(start: float, dur: float, out_filename: str,
                     filter_complex: str | None = None,
                     frame_png: str | None = None,
                     audio_graph: str = "", music_path: str | None = None,
-                    dur_read: float | None = None) -> list[str]:
+                    dur_read: float | None = None,
+                    sfx_path: str | None = None) -> list[str]:
     """Comando ffmpeg para corte 1920x1080.
 
     Com `filter_complex` (moldura de marca) aplica a cadeia -> [v] e mapeia
@@ -142,6 +157,8 @@ def build_corte_cmd(start: float, dur: float, out_filename: str,
         cmd += ["-loop", "1", "-i", frame_png]
     if music_path:
         cmd += ["-stream_loop", "-1", "-i", music_path]
+    if sfx_path:
+        cmd += ["-i", sfx_path]
     if fc:
         cmd += ["-filter_complex", fc,
                 "-map", ("[v]" if filter_complex else "0:v"),
@@ -174,7 +191,7 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
     rules = FORMAT_RULES[fmt]
     brand = resolve_brand(account)
     start = float(clip["start"])
-    dur = float(clip["end"]) - start
+    orig_dur = float(clip["end"]) - start
 
     source = paths.source_video_path(video_id)
     if not source.exists():
@@ -199,59 +216,142 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
     seed = seed_for(clip["id"])
     src_info = video_info(source)
     audio_ok = bool(src_info.get("has_audio"))
+
+    # --- Jump-cut (opt-in por conta, Fase 7, POR ULTIMO): remove pausas
+    # longas. Unica fase que muda a DURACAO (`content_dur` < orig_dur quando
+    # ha corte real). Supersede `transform.speed` (nao compoe duas alteracoes
+    # de timeline; a edicao temporal do jump-cut ja e sinal mais forte que o
+    # nudge de velocidade).
+    jc_cfg = resolve_jumpcut(account)
+    jc_pieces: list[dict] | None = None
+    jc_tm = None
+    jc_info: dict = {}
+    if jumpcut_enabled(jc_cfg) and transcript:
+        raw_pieces = jumpcut.build_segments(
+            start, start + orig_dur, transcript,
+            min_gap_s=float(jc_cfg.get("min_gap_s", 1.2)),
+            buffer_s=float(jc_cfg.get("buffer_s", 0.15)),
+        )
+        if jumpcut.has_real_cuts(raw_pieces):
+            jc_pieces = raw_pieces
+            jc_tm = TimeMap(jc_pieces)
+            jc_info = {"applied": True, "pieces": len(jc_pieces),
+                      "removed_s": round(orig_dur - jc_tm.new_duration, 3)}
+    content_dur = jc_tm.new_duration if jc_tm else orig_dur
+
+    # --- Reframe dinamico (opt-in por conta, Fase 4): corta ao redor de quem
+    # fala em vez do crop central estatico. Supersede `transform.zoom` (nao
+    # cropa duas vezes) quando de fato produz cortes de plano.
+    rcfg = resolve_reframe(account)
+    reframe_segments: list[dict] | None = None
+    reframe_info: dict = {}
+    if reframe_enabled(rcfg):
+        reframe_segments = resolve_crop_segments(clip, video_id, rcfg, mirror_x=bool(cfg.get("flip")))
+        reframe_info = {"applied": bool(reframe_segments),
+                        "segments": len(reframe_segments) if reframe_segments else 0}
+
+    # Composicao: jump-cut define OS PEDACOS que sobrevivem (tempo ORIGINAL);
+    # reframe define o CROP de cada pedaco (ponto medio), se ativo. Sem
+    # jump-cut, os segmentos do reframe seguem direto (comportamento da Fase 4).
+    crop_segments = (reframe.compose_with_keep_ranges(
+        jc_pieces, reframe_segments, reframe.target_aspect_for(fmt))
+        if jc_pieces else reframe_segments)
+
     vcfg = cfg if audio_ok else {**cfg, "speed": 1.0}
+    if crop_segments:
+        vcfg = {**vcfg, "zoom": 1.0}
+    if jc_pieces:
+        vcfg = {**vcfg, "speed": 1.0}
     speed = speed_factor(vcfg, seed)
     vfx = video_filters(vcfg, seed)
+    # `crop_segments` (speaker_track.json / jump-cut) estao em tempo ORIGINAL
+    # (pre-speed), mas o `trim=` do build_video_stage roda DEPOIS do
+    # `setpts=PTS/speed` do vfx no grafo -- precisam do mesmo `/speed` que
+    # captions.py ja aplica nas legendas (no-op quando o jump-cut ja forcou
+    # speed=1.0 acima).
+    if crop_segments and abs(speed - 1.0) > 1e-6:
+        crop_segments = [{**seg, "start": seg["start"] / speed, "end": seg["end"] / speed}
+                         for seg in crop_segments]
     music_path = pick_music(cfg, seed) if audio_ok else None
-    dur_read = dur * speed
+    dur = content_dur
+    dur_read = orig_dur * speed
     src_dur = float(src_info.get("duration_s") or 0.0)
     if src_dur and start + dur_read > src_dur:
-        dur_read = max(dur, src_dur - start)
+        dur_read = max(orig_dur, src_dur - start)
 
-    def _audio_for(has_png: bool) -> tuple[str, str | None]:
-        """audio_graph + music_path efetivos para este formato (indice da musica
-        depende do PNG: source=0, png=1, musica=ultimo)."""
-        if not audio_ok or not audio_active(cfg, seed, music_path is not None):
-            return "", None
+    # --- SFX/stinger nos cortes de plano (opt-in, Fase 6): so quando ha
+    # cortes de camera de fato (crop_segments) e a conta tem `reframe.sfx_dir`.
+    # Faixa deterministica por clip (mesmo seed do resto).
+    sfx_cuts = sfx_mod.cut_times(crop_segments) if crop_segments and audio_ok else []
+    sfx_path = sfx_mod.pick_sfx(rcfg.get("sfx_dir", ""), seed) if sfx_cuts else None
+    if not sfx_path:
+        sfx_cuts = []
+    if sfx_cuts:
+        reframe_info["sfx"] = Path(sfx_path).name
+
+    def _audio_for(has_png: bool) -> tuple[str, str | None, str | None]:
+        """audio_graph + music_path + sfx_path efetivos para este formato
+        (indice de cada input extra depende de quais existem: source=0,
+        [png=1], [musica=proximo], [sfx=ultimo])."""
+        use_sfx = bool(sfx_path and sfx_cuts)
+        if not audio_ok or (not audio_active(cfg, seed, music_path is not None)
+                            and not use_sfx and not jc_pieces):
+            return "", None, None
         m_idx = (1 + (1 if has_png else 0)) if music_path else None
-        return build_audio_graph(cfg, seed, music_index=m_idx, speed=speed), music_path
+        final_label = "aout_pre" if use_sfx else "aout"
+        in_lbl = "0:a"
+        pre_graph = ""
+        if jc_pieces:
+            pre_graph = jumpcut.build_audio_trim_filter(jc_pieces, in_label="0:a", out_label="a_jc") + ";"
+            in_lbl = "a_jc"
+        graph = pre_graph + build_audio_graph(cfg, seed, music_index=m_idx, speed=speed,
+                                              out_label=final_label, in_label=in_lbl)
+        if use_sfx:
+            s_idx = (m_idx + 1) if m_idx is not None else (1 + (1 if has_png else 0))
+            graph += ";" + sfx_mod.build_sfx_filter(
+                s_idx, sfx_cuts, float(rcfg.get("sfx_volume", 0.5)),
+                in_label=final_label, out_label="aout")
+        return graph, music_path, (sfx_path if use_sfx else None)
 
     if rules["burn_captions"]:
         if not transcript:
             raise ValueError(f"{clip['id']}: formato {fmt} exige transcript para legendas")
         ass_path = paths.clip_ass_path(video_id, clip["id"])
-        ass_path.write_text(build_ass(clip, transcript, speed=speed), encoding="utf-8")
+        ass_path.write_text(build_ass(clip, transcript, speed=speed, time_map=jc_tm), encoding="utf-8")
         frame_png = _resolve_frame_png(brand.get("short_frame"))
-        audio_graph, music = _audio_for(bool(frame_png))
+        audio_graph, music, sfx_use = _audio_for(bool(frame_png))
         cmd = build_short_cmd(
             start, dur, ass_path.name, out_name, source=source_rel,
             frame_png=frame_png, bg_hex=brand.get("short_bg_color", BG_FALLBACK),
             vfx=vfx, audio_graph=audio_graph, music_path=music, dur_read=dur_read,
+            accent_hex=brand.get("accent_color", "#FFD93D"),
+            crop_segments=crop_segments, sfx_path=sfx_use,
         )
     elif rules.get("border"):
         corte_png = _resolve_frame_png(brand.get("corte_frame"))
         if corte_png:
             # Arte PNG estatica (janela fixa) substitui a moldura gerada.
-            fc = build_corte_frame_filter(CORTE_BG_FALLBACK, has_png=True, vfx=vfx)
-            audio_graph, music = _audio_for(True)
+            fc = build_corte_frame_filter(CORTE_BG_FALLBACK, has_png=True, vfx=vfx,
+                                          crop_segments=crop_segments)
+            audio_graph, music, sfx_use = _audio_for(True)
             cmd = build_corte_cmd(start, dur, out_name, source=source_rel,
                                   filter_complex=fc, frame_png=corte_png,
                                   audio_graph=audio_graph, music_path=music,
-                                  dur_read=dur_read)
+                                  dur_read=dur_read, sfx_path=sfx_use)
         else:
             # Fallback: moldura gerada (padding + rim + faixa de texto ASS).
             border_ass = paths.clip_border_ass_path(video_id, clip["id"])
             border_ass.write_text(build_border_ass(brand), encoding="utf-8")
             fc = build_corte_filter(brand, border_ass.name, vfx=vfx)
-            audio_graph, music = _audio_for(False)
+            audio_graph, music, sfx_use = _audio_for(False)
             cmd = build_corte_cmd(start, dur, out_name, source=source_rel,
                                   filter_complex=fc, audio_graph=audio_graph,
-                                  music_path=music, dur_read=dur_read)
+                                  music_path=music, dur_read=dur_read, sfx_path=sfx_use)
     else:
-        audio_graph, music = _audio_for(False)
+        audio_graph, music, sfx_use = _audio_for(False)
         cmd = build_corte_cmd(start, dur, out_name, source=source_rel,
                               audio_graph=audio_graph, music_path=music,
-                              dur_read=dur_read)
+                              dur_read=dur_read, sfx_path=sfx_use)
 
     proc = subprocess.run(
         cmd, cwd=str(clip_dir), capture_output=True,
@@ -326,9 +426,16 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
         info["duration_s"] = video_info(out_path)["duration_s"]
 
     # Parametros de transformacao efetivamente aplicados (auditoria/reproducao).
-    tsum = transform_summary(cfg, seed, speed=speed, music_path=music_path)
+    # `vcfg`, nao `cfg`: reflete os overrides reais (speed neutro sem audio,
+    # zoom suprimido quando o reframe ja cropou).
+    tsum = transform_summary(vcfg, seed, speed=speed, music_path=music_path)
     if tsum:
         info["transform"] = tsum
+    if reframe_info:
+        info["reframe"] = reframe_info
+    if jc_info:
+        info["jumpcut"] = jc_info
+        info["content_duration_s"] = round(content_dur, 3)
     return info
 
 

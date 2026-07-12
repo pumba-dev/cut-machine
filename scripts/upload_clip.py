@@ -101,6 +101,7 @@ def main() -> None:
         "language": plan.get("source", {}).get("language") or "pt-BR",
         # miniatura best-effort (thumbnails.set); ausencia nao impede o upload
         "thumbnail_path": str(paths.ROOT / thumb_rel) if thumb_rel else None,
+        "format": clip.get("format"),
     }
 
     try:
@@ -127,6 +128,8 @@ def main() -> None:
         "url": result["url"],
         "published_at": result["published_at"],
     })
+    if "thumbnail_set" in result:
+        publish["thumbnail_set"] = result["thumbnail_set"]
     contracts.set_clip_status(clip, "published")
     contracts.save_plan(plan_path, plan)
 

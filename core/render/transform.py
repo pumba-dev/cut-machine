@@ -44,22 +44,30 @@ _JITTER_SPAN = {
     "brightness": 0.02,
     "saturation": 0.05,
     "gamma": 0.03,
+    "eq_notch_db": 0.4,
+    "noise": 3.0,
 }
 
 # Limites duros (mantem legibilidade e evita valores que reprovariam no QA).
 _SPEED_MIN, _SPEED_MAX = 0.95, 1.05
 _ZOOM_MAX = 1.15
+_NOTCH_DB_MIN = -5.0     # notch mais fundo que isso abafa sibilancia/consoantes (voz muffled)
+_NOISE_MAX = 40.0        # forca de grain acima disso vira granulado visivel + estoura bitrate
 
 TRANSFORM_DEFAULTS = {
     "speed": 1.0,            # 1.0 = off
     "pitch_semitones": 0.0,  # 0 = off
     "eq": False,             # highpass/lowpass + equalizer + acompressor
+    "eq_notch": False,       # dip 5-8kHz na "assinatura de voz" (requer eq); off por padrao
+    "eq_notch_db": -3.0,     # profundidade do notch em dB (negativo); clamp [-5, 0]
+    "noise": 0.0,            # grain de luma temporal por frame; 0 = off (pixels distintos por frame)
     "music_dir": "",         # "" = off
     "music_volume": 0.20,    # ganho (trim) apos a normalizacao; a voz sempre tem prioridade
     "music_lufs": -16.0,     # alvo de loudness da musica (loudnorm) — iguala faixas de loudness diferente
     "color": None,           # dict {contrast,brightness,saturation,gamma} = off se None
     "lut": "",               # path .cube (tem precedencia sobre color); "" = off
     "zoom": 1.0,             # 1.0 = off
+    "flip": False,           # espelha horizontalmente (hflip) -- pixels tecnicamente distintos
     "jitter": 0.0,           # 0 = fixo; ate 1.0 = amplitude relativa da variacao por clip
 }
 
@@ -154,6 +162,20 @@ def _zoom(cfg: dict, seed: int) -> float:
     return _clamp(base + _jitter_delta(cfg, seed, "zoom"), 1.0, _ZOOM_MAX)
 
 
+def _noise(cfg: dict, seed: int) -> float:
+    """Forca efetiva do grain de video (0 = off)."""
+    base = _as_float(cfg.get("noise"), 0.0)
+    if base <= 1e-6:
+        return 0.0
+    return _clamp(base + _jitter_delta(cfg, seed, "noise"), 0.0, _NOISE_MAX)
+
+
+def _notch_db(cfg: dict, seed: int) -> float:
+    """Ganho efetivo do notch 5-8kHz em dB (negativo; 0 = sem dip)."""
+    base = _as_float(cfg.get("eq_notch_db"), -3.0)
+    return _clamp(base + _jitter_delta(cfg, seed, "eq_notch_db"), _NOTCH_DB_MIN, 0.0)
+
+
 def _music_volume(cfg: dict, seed: int) -> float:
     base = _as_float(cfg.get("music_volume"), 0.08)
     return _clamp(base + _jitter_delta(cfg, seed, "music_volume"), 0.0, 0.5)
@@ -221,6 +243,15 @@ def video_filters(cfg: dict, seed: int) -> str:
     color = _color_filter(cfg, seed)
     if color:
         parts.append(color)
+    if cfg.get("flip"):
+        parts.append("hflip")
+    noise = _noise(cfg, seed)
+    if noise > 0.0:
+        # Grain de LUMA (c0 evita speckle de croma em yuv420p) TEMPORAL (c0f=t:
+        # frame novo a cada frame -> DCT distinto por frame), seed deterministico
+        # por clip (idempotente). Aplicado na resolucao da fonte, antes do scale.
+        # c0s (strength) e INT no ffmpeg -> arredonda.
+        parts.append(f"noise=c0s={round(noise)}:c0f=t:all_seed={seed % 2147483647}")
     return ",".join(parts) + "," if parts else ""
 
 
@@ -239,23 +270,33 @@ def audio_active(cfg: dict, seed: int, has_music: bool) -> bool:
 
 
 def build_audio_graph(cfg: dict, seed: int, *, music_index: int | None = None,
-                      speed: float = 1.0, out_label: str = "aout") -> str:
+                      speed: float = 1.0, out_label: str = "aout",
+                      in_label: str = "0:a") -> str:
     """Subgrafo de audio do filter_complex, terminado em `[out_label]`.
 
-    Voz (`[0:a]`): normaliza para 48k, EQ + acompressor (se `eq`), pitch
-    SR-agnostico (asetrate/atempo) e `atempo=speed` (casa com o `setpts` do
-    video). Com musica: `loudnorm` iguala o loudness de QUALQUER faixa ao alvo
-    `music_lufs` (mata o spread entre faixas — o motivo de uma cama sumir e outra
-    estourar), `volume` faz o trim fino, e o duck reverso (`sidechaincompress`,
-    sidechain = voz) abaixa a musica na fala; mistura com `amix duration=first`
-    (comprimento = o da voz -> saida invariante). A VOZ nunca e comprimida pela
-    musica; so a musica cede.
+    Voz (`in_label`, default `0:a`): normaliza para 48k, EQ + acompressor (se
+    `eq`), pitch SR-agnostico (asetrate/atempo) e `atempo=speed` (casa com o
+    `setpts` do video). Com musica: `loudnorm` iguala o loudness de QUALQUER
+    faixa ao alvo `music_lufs` (mata o spread entre faixas — o motivo de uma
+    cama sumir e outra estourar), `volume` faz o trim fino, e o duck reverso
+    (`sidechaincompress`, sidechain = voz) abaixa a musica na fala; mistura com
+    `amix duration=first` (comprimento = o da voz -> saida invariante). A VOZ
+    nunca e comprimida pela musica; so a musica cede.
+
+    `in_label` (core.render.jumpcut, opt-in): quando o jump-cut ja cortou
+    `[0:a]` em `[a_jc]` (trim+concat nos mesmos pontos do video), a cadeia de
+    voz continua a PARTIR do audio ja cortado, nao do audio cru.
     """
-    voice: list[str] = ["[0:a]aresample=48000"]
+    voice: list[str] = [f"[{in_label}]aresample=48000"]
     if cfg.get("eq"):
         voice.append("highpass=f=60")
         voice.append("lowpass=f=15000")
         voice.append("equalizer=f=3000:t=q:w=1.5:g=2")
+        if cfg.get("eq_notch"):
+            # Dip largo (~4.7-7.9kHz) na banda de "assinatura de voz", ANTES do
+            # compressor (o acompressor reage ao sinal ja atenuado). Peaking com
+            # ganho negativo (nao brick-wall) para nao "lispar" a voz.
+            voice.append(f"equalizer=f=6300:t=q:w=2.0:g={_notch_db(cfg, seed):.2f}")
         voice.append("acompressor=threshold=-18dB:ratio=3:attack=20:release=250")
     ratio = _pitch_ratio(cfg, seed)
     if abs(ratio - 1.0) > 1e-6:
@@ -313,11 +354,18 @@ def summary(cfg: dict, seed: int, *, speed: float, music_path: str | None) -> di
         out["pitch_semitones"] = round(12.0 * math.log2(ratio), 4)
     if cfg.get("eq"):
         out["eq"] = True
+        if cfg.get("eq_notch"):
+            out["eq_notch_db"] = round(_notch_db(cfg, seed), 2)
     zoom = _zoom(cfg, seed)
     if zoom > 1.0 + 1e-6:
         out["zoom"] = round(zoom, 5)
     if _color_filter(cfg, seed):
         out["color"] = _color_filter(cfg, seed)
+    if cfg.get("flip"):
+        out["flip"] = True
+    noise = _noise(cfg, seed)
+    if noise > 0.0:
+        out["noise"] = round(noise, 1)
     if music_path:
         out["music"] = Path(music_path).name
         out["music_volume"] = round(_music_volume(cfg, seed), 4)

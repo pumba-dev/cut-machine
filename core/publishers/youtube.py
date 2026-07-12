@@ -6,6 +6,7 @@ aqui). Imports google ficam dentro dos metodos para o pacote carregar sem as
 deps instaladas.
 """
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,20 @@ SCOPES = [
 ]
 CHUNK_SIZE = 8 * 1024 * 1024
 QUOTA_REASONS = {"quotaExceeded", "dailyLimitExceeded", "uploadLimitExceeded"}
+
+# Shorts recem-publicados: a classificacao interna do YouTube (video vertical
+# curto -> Short) ainda nao terminou no instante seguinte ao videos.insert, e
+# o thumbnails.set() e ignorado mesmo respondendo 200 (a API confirma OK e o
+# campo publish.thumbnail_set fica True, mas a thumb nunca aparece no Studio).
+# Confirmado empiricamente 2026-07-09 e de novo 2026-07-11 (shorts da conta
+# negocios com thumbnail_set=True e sem thumb aplicada) — um delay fixo de
+# 120s nao e suficiente. Troca: em vez de dormir um tempo fixo e tentar as
+# cegas, faz *poll* de videos.list ate o video sair de uploadStatus="uploaded"
+# para "processed" (processamento completo, inclusive classificacao Short) e
+# so entao tenta o thumbnails.set — so para format == "short"; corte
+# (long-form) nao precisa (nunca precisou).
+SHORT_THUMBNAIL_POLL_INTERVAL_S = 20
+SHORT_THUMBNAIL_MAX_WAIT_S = 600
 
 
 def _now_iso() -> str:
@@ -62,19 +77,27 @@ def _fit_tags(tags: list, budget: int = 500) -> list[str]:
     return result
 
 
+def _http_error_reason(exc: Any) -> str | None:
+    """Extrai o `reason` estruturado (ex.: 'uploadRateLimitExceeded') de um HttpError."""
+    details = getattr(exc, "error_details", None) or []
+    for d in details:
+        if isinstance(d, dict) and d.get("reason"):
+            return d["reason"]
+    content = getattr(exc, "content", b"") or b""
+    if isinstance(content, bytes):
+        content = content.decode("utf-8", errors="replace")
+    for reason in QUOTA_REASONS | {"uploadRateLimitExceeded"}:
+        if reason in content:
+            return reason
+    return None
+
+
 def _is_quota_error(exc: Any) -> bool:
     """HttpError 403 com reason de quota (quotaExceeded e afins)."""
     status = getattr(getattr(exc, "resp", None), "status", None)
     if status != 403:
         return False
-    details = getattr(exc, "error_details", None) or []
-    reasons = {d.get("reason") for d in details if isinstance(d, dict)}
-    if reasons & QUOTA_REASONS:
-        return True
-    content = getattr(exc, "content", b"") or b""
-    if isinstance(content, bytes):
-        content = content.decode("utf-8", errors="replace")
-    return any(reason in content for reason in QUOTA_REASONS)
+    return _http_error_reason(exc) in QUOTA_REASONS
 
 
 class YouTubePublisher(Publisher):
@@ -168,33 +191,95 @@ class YouTubePublisher(Publisher):
         }
         thumb = metadata.get("thumbnail_path")
         if thumb:
-            result["thumbnail_set"] = _set_thumbnail(youtube, remote_id, Path(thumb))
+            is_short = metadata.get("format") == "short"
+            ok, _rate_limited = _set_thumbnail(
+                youtube, remote_id, Path(thumb), wait_for_processing=is_short)
+            result["thumbnail_set"] = ok
         return result
 
+    def set_thumbnail(self, remote_id: str, thumb_path: Path, account: dict,
+                       wait_for_processing: bool = False) -> tuple[bool, bool]:
+        """thumbnails.set fora do fluxo de upload — retrofit de video ja
+        publicado (usado por scripts/thumbnail_backfill.py). Retorna
+        (ok, rate_limited)."""
+        from googleapiclient.discovery import build
 
-def _set_thumbnail(youtube: Any, remote_id: str, thumb_path: Path) -> bool:
-    """thumbnails.set best-effort (custa 50 unidades). Nunca lanca: canal nao
-    verificado (403), quota, arquivo ausente etc. viram aviso no stderr. O
-    upload ja esta 'published' independentemente disso."""
+        creds = self.authenticate(account)
+        youtube = build("youtube", "v3", credentials=creds)
+        return _set_thumbnail(youtube, remote_id, thumb_path,
+                               wait_for_processing=wait_for_processing)
+
+
+def _wait_for_processed(youtube: Any, remote_id: str, max_wait_s: int,
+                         poll_interval_s: int) -> bool:
+    """Poll de videos.list (part=status, 1 unidade por chamada — bem mais
+    barato que uma tentativa extra de thumbnails.set a 50) ate
+    uploadStatus == "processed" ou estourar max_wait_s. Retorna True se
+    processou a tempo; False se estourou o teto ou o video falhou/foi
+    rejeitado (chamador tenta o thumbnails.set assim mesmo — best-effort)."""
+    deadline = time.monotonic() + max_wait_s
+    while True:
+        try:
+            resp = youtube.videos().list(part="status", id=remote_id).execute()
+            items = resp.get("items") or []
+            upload_status = (items[0].get("status") or {}).get("uploadStatus") if items else None
+        except Exception as exc:
+            print(f"thumbnail: erro ao consultar status de {remote_id}: {exc}",
+                  file=sys.stderr)
+            upload_status = None
+
+        if upload_status == "processed":
+            return True
+        if upload_status in ("failed", "rejected", "deleted"):
+            print(f"thumbnail: {remote_id} uploadStatus={upload_status}; "
+                  "abortando espera de processamento", file=sys.stderr)
+            return False
+        if time.monotonic() >= deadline:
+            print(f"thumbnail: {remote_id} nao processou em {max_wait_s}s "
+                  f"(uploadStatus={upload_status}); tentando thumbnails.set assim mesmo",
+                  file=sys.stderr)
+            return False
+        time.sleep(poll_interval_s)
+
+
+def _set_thumbnail(youtube: Any, remote_id: str, thumb_path: Path,
+                    wait_for_processing: bool = False) -> tuple[bool, bool]:
+    """thumbnails.set best-effort, 1 unica tentativa (50 unidades). Nunca
+    lanca: canal nao verificado, quota, arquivo ausente etc. viram aviso no
+    stderr — o upload ja esta 'published' independentemente disso. Retorna
+    (ok, rate_limited).
+
+    `wait_for_processing` faz poll (`_wait_for_processed`) ate o video estar
+    totalmente processado antes da tentativa: logo apos o insert, o YouTube
+    ainda pode nao ter classificado o video como Short, e o thumbnails.set()
+    e ignorado mesmo respondendo 200 (ver comentario de
+    SHORT_THUMBNAIL_MAX_WAIT_S)."""
     from googleapiclient.errors import HttpError
     from googleapiclient.http import MediaFileUpload
 
     if not thumb_path.exists():
         print(f"thumbnail: arquivo nao encontrado ({thumb_path}); pulando",
               file=sys.stderr)
-        return False
+        return False, False
+
+    if wait_for_processing:
+        _wait_for_processed(youtube, remote_id, SHORT_THUMBNAIL_MAX_WAIT_S,
+                             SHORT_THUMBNAIL_POLL_INTERVAL_S)
+
     mime = "image/png" if thumb_path.suffix.lower() == ".png" else "image/jpeg"
     try:
         youtube.thumbnails().set(
             videoId=remote_id,
             media_body=MediaFileUpload(str(thumb_path), mimetype=mime),
         ).execute()
-        return True
+        return True, False
     except HttpError as exc:
-        reason = "canal nao verificado / quota / video bloqueado"
-        print(f"thumbnail: thumbnails.set falhou ({reason}): {exc}; "
-              "suba a miniatura manualmente no YouTube Studio", file=sys.stderr)
-        return False
-    except Exception as exc:  # rede, credencial, etc. — best-effort
-        print(f"thumbnail: thumbnails.set erro inesperado: {exc}", file=sys.stderr)
-        return False
+        status = getattr(getattr(exc, "resp", None), "status", None)
+        reason = _http_error_reason(exc)
+        print(f"thumbnail: thumbnails.set falhou (HTTP {status} {reason or ''}): "
+              f"{exc}; suba a miniatura manualmente no YouTube Studio", file=sys.stderr)
+        return False, reason == "uploadRateLimitExceeded"
+    except Exception as exc:  # rede, credencial, etc.
+        print(f"thumbnail: erro inesperado: {exc}; suba a miniatura manualmente "
+              "no YouTube Studio", file=sys.stderr)
+        return False, False

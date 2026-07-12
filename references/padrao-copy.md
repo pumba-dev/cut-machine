@@ -1,51 +1,151 @@
 # Padrão editorial de copy — título, descrição e tags
 
-Fonte única do padrão de copy do canal. Em conflito com qualquer outra referência
-(`heuristicas-virais.md`, `formatos-redes.md`), **este arquivo vence**. As regras de
-quantidade/formato daqui têm espelho verificado em código (`core/contracts.py`:
-`validate_plan` para erros duros, `lint_copy` para avisos) — mudou aqui, mude lá.
+Fonte única do padrão de copy **universal** (vale para TODOS os canais). Em conflito com
+qualquer outra referência (`heuristicas-virais.md`, `formatos-redes.md`), **este arquivo
+vence**. As regras de quantidade/formato daqui têm espelho verificado em código
+(`core/contracts.py`: `validate_plan` para erros duros, `lint_copy` para avisos) — mudou
+aqui, mude lá.
+
+**Multi-canal:** este arquivo é agnóstico de nicho — princípios, formato e limites que
+valem para qualquer canal. O que é **específico de nicho** (arquétipos próprios, exemplos
+de gancho com nomes reais, hashtags de tema, avisos legais) vive em
+`references/copy/<perfil>.md`, onde `<perfil>` = campo `copy_profile` da conta em
+`config/accounts.json` (ex.: `politica`, `financas`). O copywriter lê **os dois**: este +
+o do perfil da conta. Conta sem `copy_profile` roda só com este (universal). Os exemplos
+abaixo são **ilustrativos/neutros** — o caso real, com nomes e citações do nicho, vem do
+arquivo de perfil.
+
+## Objetivo e prioridades
+
+O copywriter **não resume o vídeo** — resumo é trabalho da descrição, não do gancho. O
+objetivo é maximizar, nesta ordem: CTR -> retenção -> compartilhamentos -> comentários ->
+tempo de exibição. **SEO é secundário**: em conflito entre SEO e CTR, CTR vence.
+
+Hierarquia de toda copy (título, `title_alts`, `thumbnail_text`): **Emoção > Curiosidade >
+Clareza > Especificidade > SEO.** Nunca sacrificar emoção para deixar o título mais
+descritivo.
+
+**Antes de escrever qualquer título**, responda mentalmente (o raciocínio guia o texto
+final, não precisa ser registrado em lugar nenhum):
+
+- Qual é o momento mais forte do clip?
+- Qual frase gera a maior reação emocional?
+- Qual é o maior conflito?
+- Existe uma fala memorável, uma contradição, uma revelação ou uma consequência importante?
+- Existe uma pergunta que naturalmente surge na cabeça do espectador?
+
+O título nasce dessas respostas — nunca do resumo do vídeo.
+
+## Regra de ouro
+
+A função da copy não é informar — é fazer a pessoa sentir que **precisa** clicar. O vídeo
+entrega a informação prometida depois do clique.
+
+- **Nunca afirme o que o conteúdo não sustenta.** Nunca apresente especulação como fato.
+- **Nunca atribua crime, ilegalidade ou intenção a alguém sem que isso esteja explicitamente
+  sustentado pelo conteúdo ou por fatos verificáveis** — em qualquer nicho que fale de pessoas
+  ou instituições nomeadas (figuras públicas, empresas, gestores) isso não é só tom, é risco
+  reputacional e legal real (difamação). Avisos legais próprios de cada nicho:
+  `references/copy/<perfil>.md`.
+- A intensidade emocional deve **aumentar o interesse**, nunca **alterar o significado** do
+  que foi dito.
+
+Isso vale igual para título, `title_alts` e `thumbnail_text`.
 
 ## Título
 
-**Formato: `<GANCHO EM CAIXA ALTA> | #tag #tag #tag`** (revisado 2026-07-08 v2 —
-volta o ` | #tags`, mas **sem a CATEGORIA** que atrapalhava o gancho).
+**Formato depende do formato do clip** (revisado — corte sem tag nenhuma no
+título, short só com `#shorts`; as hashtags de nicho continuam existindo no
+bloco 4 da descrição e no campo `tags`, então tirá-las do título não reduz
+descoberta, só limpa o título):
 
 ```
-GANCHO CURTO E FORTE EM CAIXA ALTA | #tag1 #tag2 #tag3
+corte: GANCHO CURTO E FORTE EM CAIXA ALTA
+short: GANCHO CURTO E FORTE EM CAIXA ALTA | #shorts
 ```
 
-- **Texto (antes do ` | `)**: o gancho puro em **CAIXA ALTA**, seguindo
-  `heuristicas-virais.md` §5 (curiosity gap honesto, número, polêmica, citação).
-  **Sem categoria**, sem hashtags no meio do texto. Nunca prometer o que o clip
-  não entrega.
-- **Exatamente 3 hashtags** depois do ` | `, minúsculas sem acento:
-  - **short**: `#shorts` é OBRIGATÓRIA (primeira) **+ 2** das `default_hashtags`
-    da conta, as mais coerentes com o clip.
-  - **corte**: **3** das `default_hashtags` da conta, coerentes com o clip (SEM
-    `#shorts`).
-  - As hashtags que não são `#shorts` saem SEMPRE da lista `default_hashtags` de
-    `config/accounts.json`.
-- **`#shorts` em short é obrigatória no título E no vídeo** (bloco 4 da
+- **Texto**: o gancho puro em **CAIXA ALTA**, seguindo `heuristicas-virais.md`
+  §5 (curiosity gap honesto, número, polêmica, citação). **Sem categoria**, sem
+  hashtags no meio do texto. Nunca prometer o que o clip não entrega — **e se a
+  promessa só se cumpre muito tarde no clip, troque de gancho** em vez de forçar
+  uma promessa que demora demais a pagar.
+- **`corte`**: só o gancho. **Nenhum ` | `, nenhuma hashtag** no título — as
+  hashtags de nicho vivem no bloco 4 da descrição e no campo `tags`.
+- **`short`**: gancho + ` | #shorts` — **só essa hashtag, fixa, sem completar
+  com mais nenhuma**. `#shorts` é obrigatória no título E no vídeo (bloco 4 da
   descrição) — as duas.
 - Proibido `<` e `>` (a API do YouTube rejeita).
 
-Orçamento: **limite duro da API 100 chars** (texto + ` | ` + 3 hashtags juntos).
-As hashtags comem ~25–35 chars, então mire o **texto em <= ~50 chars** para caber.
-Aviso de lint acima de 100.
+Orçamento: **limite duro da API 100 chars**. `corte` não perde chars com tag
+(texto pode ir quase até 100); `short` perde só os ~11 chars de ` | #shorts`.
+Em ambos, mire o **texto em <= ~70 chars** (`TITLE_RECOMMENDED`, mobile trunca
+por volta daí). Aviso de lint acima de 100.
+
+### Biblioteca de hooks (arquétipos)
+
+Todo título e toda variante de `title_alts` usa um destes arquétipos. A diversidade
+obrigatória (ver Variantes abaixo) é entre arquétipos, não só entre palavras:
+
+- **Curiosidade** — O QUE NINGUÉM PERCEBEU, O DETALHE ESCONDIDO, NINGUÉM ESPERAVA ISSO,
+  A VERDADE SOBRE...
+- **Revelação** — ELE ADMITIU..., ELE REVELOU..., ESCANCAROU..., CONFESSOU...
+- **Conflito** — DETONOU..., RESPONDEU..., CALOU..., PARTIU PRA CIMA..., BATEU DE FRENTE...
+- **Contradição** — DISSE UMA COISA... MAS FEZ OUTRA, MUDOU O DISCURSO, VOLTOU ATRÁS...
+- **Consequência** — ISSO MUDA TUDO, O PREÇO DISSO, O QUE ACONTECE AGORA, COMO ISSO
+  IMPACTA...
+- **Pergunta** — POR QUE ISSO ACONTECEU?, O QUE ELE QUIS DIZER?, COMO ISSO TERMINOU?,
+  QUEM GANHA COM ISSO?
+- **Citação** — a frase mais forte do clip entre aspas, verbatim. Citação crua > resumo
+  parafraseado (ver critério de ranking em Variantes abaixo).
+- **Número** — dinheiro, porcentagem, quantidade, prazo ou ranking como âncora emocional.
+- **Sistema/Inimigo comum** — enquadra um "eles" contra o espectador: O QUE NÃO QUEREM
+  QUE VOCÊ VEJA..., A ESTRATÉGIA POR TRÁS DE..., O QUE ESCONDERAM DE VOCÊ... O "inimigo"
+  concreto depende do nicho (os alvos e exemplos reais estão em `references/copy/<perfil>.md`).
+  **Só use quando a transcrição sustenta especificamente a alegação** (a pessoa realmente
+  descreve algo sendo escondido, uma estratégia ou um plano) — nunca fabricar narrativa de
+  conspiração que o clip não mostra (Regra de ouro).
 
 ### Variantes para teste A/B (`title_alts`)
 
-Pool ranqueado de 6–10 variantes (best-first), **cada uma no MESMO formato**
-`<TEXTO CAIXA ALTA> | #tag #tag #tag` — **as mesmas 3 hashtags** do `title` (só o
-TEXTO muda entre as variantes), **minúsculas e SEM acento** (`#politica`, não
-`#política`). O `title` recebe a variante mais forte (rank 1); **`title_alts` são
-as DEMAIS variantes — NÃO repita o `title` dentro de `title_alts`** (o pool
-`title` + `title_alts` tem que ser todo distinto).
+Pool ranqueado de 6–10 variantes (best-first), **cada uma no MESMO formato do
+`title`** (corte: só o gancho; short: gancho + ` | #shorts`) — só o TEXTO muda
+entre as variantes. O `title` recebe a variante mais forte (rank 1);
+**`title_alts` são as DEMAIS variantes — NÃO repita o `title` dentro de
+`title_alts`** (o pool `title` + `title_alts` tem que ser todo distinto).
 
-- **Cada variante ataca um ângulo diferente** do MESMO clip (curiosity gap,
-  número/dado, contradição, citação entre aspas, pergunta direta, callout
-  ("VOCÊ...", "NINGUÉM TE CONTA..."), perda/medo, autoridade/bastidor).
-- **Ranqueie** por potencial de CTR (a mais forte primeiro = vira o `title`).
+- **Cada variante usa um arquétipo diferente** da Biblioteca de hooks acima
+  (curiosidade, revelação, conflito, contradição, consequência, pergunta, citação,
+  número, sistema/inimigo comum) **ou dos arquétipos próprios do nicho** (ver
+  `references/copy/<perfil>.md`). Sem clickbait mentiroso. **Diversidade
+  obrigatória:** nunca duas variantes com a mesma estrutura de abertura ou o mesmo
+  arquétipo — se acontecer, reescreva uma.
+- **Ranqueie** por potencial de CTR — e o critério nº1 de CTR é **carga emocional**,
+  não precisão descritiva. Entre duas opções igualmente honestas, a que dói mais
+  vence, mesmo que a mais "neutra" pareça editorialmente mais completa.
+  - **Avalie cada variante** por: emoção, curiosidade, choque, surpresa, medo de
+    perder, especificidade, clareza e potencial de compartilhamento. Ordene do
+    maior pro menor potencial de CTR combinado — não só pela primeira impressão.
+  - **Citação crua > paráfrase educada.** Se o entrevistado usou uma palavra forte
+    ("escrota", "vagabundo", "roubo", "furada"), **use a palavra dele entre aspas** em
+    vez de suavizar/generalizar — a fala crua bate mais forte que o resumo de aula. Ex.:
+    "'ISSO É UM ROUBO', DISPAROU FULANO" vence "COMO O ESQUEMA FUNCIONA, SEGUNDO FULANO".
+    Mesma regra vale pra `impact`/`hooks` da miniatura. Exemplos reais por nicho (com
+    nomes e citações típicas): `references/copy/<perfil>.md`.
+  - **Nomear o alvo/vilão específico > descrever o fenômeno em abstrato.** Cravar o nome
+    próprio + a palavra forte lado a lado ("FULANO" + "CORRUPTO", "O BANCO X" + "TE
+    ENGANA") cutuca; o enquadramento acadêmico ("COMO FUNCIONA O SISTEMA") não cutuca
+    ninguém. Prefira o nome próprio, a cifra exata, a acusação direta — o que dá pra
+    alguém discordar/concordar visceralmente — em vez do enquadramento explicativo. Quem
+    é o "alvo" típico de cada nicho (instituições, figuras, empresas) está em
+    `references/copy/<perfil>.md`.
+  - A variante rank 1 é a que um leitor sente ANTES de entender — raiva, choque,
+    indignação, alívio. Se a melhor variante do pool ainda soa como manchete de
+    jornal, o pool está fraco: refaça mirando a citação ou o alvo mais crus que
+    o clip sustenta (sempre dentro do que foi realmente dito — nunca invente).
+- **Autocrítica antes de fechar o pool:** para a variante rank 1 (a que vira o
+  `title`), pergunte "essa variante desperta emoção antes mesmo de ser
+  completamente entendida?". Se a resposta for não, gere novas opções em vez de
+  aceitar a que já tem.
 - **Como testar:** o YouTube Studio ("Testar e comparar") rotaciona **até 3 títulos**
   e mede retenção/CTR — recurso **só do Studio, não da API**. Use as 3 primeiras do
   pool no teste nativo; as demais ficam de reserva. A Data API não rotaciona título.
@@ -59,12 +159,80 @@ palavra tem que refletir o clip, senão vira clickbait e mata o canal):
   NINGUÉM TE CONTA, BASTIDORES, VAZOU, ADMITIU, CONFESSOU.
 - **Conflito/polêmica:** DETONOU, ALFINETOU, RESPONDEU, CALOU, DESMASCAROU, CANSOU,
   RASGOU, POLÊMICA, GUERRA, x VERSUS y.
-- **Curiosidade/urgência:** POR QUE, O QUE NINGUÉM VIU, ATÉ O FIM, O ERRO QUE,
-  O MOMENTO EM QUE, VOCÊ NÃO VAI ACREDITAR (só se o clip sustenta), AGORA.
+- **Curiosidade/urgência:** POR QUE, O QUE NINGUÉM VIU, NINGUÉM ESPERAVA, O DETALHE,
+  ATÉ O FIM, O ERRO QUE, O MOMENTO EM QUE, VOCÊ NÃO VAI ACREDITAR (só se o clip
+  sustenta), AGORA, URGENTE (só quando genuinamente aplicável).
 - **Número/perda:** cifras (R$), porcentagens, "3 SINAIS", "PERDEU TUDO",
   "CUSTOU CARO", "O PREÇO DE".
+- **Sistema/inimigo comum** (arquétipo acima, mesma ressalva de honestidade):
+  A ESTRATÉGIA DELES, O QUE ELES ESCONDEM, O PLANO POR TRÁS. O "eles" concreto e as
+  power words próprias do nicho ficam em `references/copy/<perfil>.md`.
 - Evite: caps-lock gritado sem gancho, promessa não cumprida, sensacionalismo que
   o clip não entrega, e repetir a MESMA palavra em todas as variantes.
+
+## Anti-padrões (risco de shadowban/desmonetização)
+
+Linguagem extrema derruba alcance/monetização **antes de alguém clicar** — o filtro de
+anúncios do YouTube (advertiser-friendly guidelines) pode marcar o vídeo como "limited ads"
+ou reduzir a distribuição; nesse caso o CTR do título deixa de importar porque o vídeo já não
+é mostrado. Mais sensível em nichos que tocam pessoas/instituições nomeadas (política;
+finanças com crítica a empresas/gestores) — avisos próprios do nicho em
+`references/copy/<perfil>.md`. Evitar:
+
+- Discurso de ódio, termos discriminatórios ou chamado à violência.
+- **Acusação de crime/ilegalidade não sustentada** — liga direto com a Regra de ouro.
+- Clickbait comprovadamente falso — além de matar retenção, a própria política de
+  metadados enganosos do YouTube penaliza o vídeo.
+- "URGENTE"/"ALERTA" vazio e repetido sem fato novo que sustente.
+- Caps-lock gritado sem gancho real (já listado em "Evite" acima) — sinaliza spam pro
+  classificador de anúncios, não só pro leitor.
+
+**Isso não contradiz a citação crua/nomear o vilão específico já recomendado acima** — o
+anti-padrão é *inventar ou escalar* além do que foi dito, não usar a intensidade real que já
+está no clipe. Uma citação forte que a pessoa realmente disse é honesta; uma acusação que o
+copywriter inventou por cima não é.
+
+### Temas sensíveis (advertiser-friendly)
+
+Em nichos de comentário jornalístico/notícia (política, economia, atualidades) as
+**variantes de matar/morrer (matou, mataram, morreu, morte, morto) são LIBERADAS** — fazem
+parte da cobertura e são o gancho real de muitos cortes. Não suavize essas palavras:
+emburrecem o título e enfraquecem a citação crua. (Nicho que não cobre crime/morte
+simplesmente não topa com elas — a regra não atrapalha.)
+
+O que **NÃO** pode aparecer explícito no metadado (o classificador de anúncios do YouTube
+marca "limited ads" / reduz a entrega antes de qualquer clique — gate técnico, como o `<`/`>`
+que a API rejeita):
+
+- **Assassinato** (e variantes: "assassinado", "assassino") e **arma / armas**.
+- **Suicídio / automutilação** — inclui "se matou" descrito como método (o "matou" solto
+  segue liberado; o gatilho é o tema suicídio).
+- **Crimes hediondos sexuais explícitos** — estupro (e variantes: "estuprou", "estuprador"),
+  abuso/exploração sexual, pedofilia/abuso infantil.
+- **Conteúdo sexual explícito.**
+
+Nesses casos, **contorne com termo genérico sem mudar o que foi dito** (a Regra de ouro
+continua: suaviza o registro, nunca o significado). Vale para **título, `title_alts`,
+descrição, `tags` e `thumbnail_text`** (o filtro lê o texto queimado na miniatura por OCR):
+
+| Evite (tema sensível) | Prefira |
+|---|---|
+| assassinato / assassinado / assassino | crime, ataque, executou |
+| arma / armas | equipamento |
+| suicídio / se matou (como método) | tirou a própria vida, pôs fim à vida |
+| estupro / estuprou / estuprador | crime bárbaro, crime hediondo, abuso, violência |
+| abuso sexual / pedofilia | crime contra criança, crime hediondo |
+| sexo / sexual (explícito) | intimidade, relacionamento íntimo (só quando necessário) |
+
+- **Reconciliação com a citação crua:** a preferência por citação crua/palavra forte (seção
+  Variantes) segue valendo para matar/morrer e para insulto/impacto (escrota, vagabundo,
+  palhaçada) — mantenha. Só contorne quando a palavra for de um **tema sensível da lista
+  acima** (assassinato, arma, suicídio, crime sexual hediondo, sexo explícito). Ex.: citação
+  "ELE ESTUPROU" → "ELE COMETEU UM CRIME BÁRBARO" mantém o peso sem o gatilho.
+- **Palavrão pesado:** uma palavra forte genuína numa única citação costuma passar; **não
+  empilhe** vários numa mesma copy nem use termos discriminatórios/slur — aí é gatilho.
+- **Não use gambiarra de grafia** (su1cídio, quebrar a palavra com espaço) — sinaliza spam pro
+  classificador e polui a busca. Prefira o termo genérico real.
 
 ## Descrição
 
@@ -95,25 +263,31 @@ título e descrição). Escreva "menor que"/"maior que" ou use "menos de R$ 5".
 
 ## Tags
 
-**10 a 15 tags por clip**, minúsculas, sem `#`, do específico para o genérico:
+**10 a 15 tags por clip**, minúsculas, sem `#`, em ordem de prioridade:
 
-1. Assunto, pessoas e termos exatos ditos na **transcrição do clip** (o que
-   alguém buscaria para achar ESTE corte).
-2. Padrões das hashtags mais usadas no contexto/nicho do vídeo.
-3. Completar até 10–15 com as **`default_hashtags` da conta** em
+1. **Nomes de pessoas citadas/faladas na transcrição do clip** — prioridade
+   MÁXIMA, sempre primeiro na lista. É o que faz o clip aparecer em buscas por
+   nome de figura pública (o sinal de busca mais forte que existe).
+2. Assunto/tema exato dito na **transcrição do clip** (o que alguém buscaria
+   para achar ESTE corte, além dos nomes).
+3. Padrões das hashtags mais usadas no contexto/nicho do vídeo.
+4. Completar até 10–15 com as **`default_hashtags` da conta** em
    `config/accounts.json` (removendo o `#`) — lista curada por canal, coerente
    com o `niche` da conta.
 
 Orçamento da API: soma <= 500 chars, contando **+2 por tag com espaço** (a API
 envolve em aspas). 15 tags de ~20 chars ≈ 330 — folga. Se estourar, corte do FIM
-(as genéricas valem menos que as específicas).
+(as mais genéricas valem menos que nome/assunto específico — por isso nomes
+vão primeiro: `_fit_tags`, `core/publishers/youtube.py`, corta sempre do fim da
+lista, então nomes na frente nunca são cortados).
 
-As hashtags do bloco 4 da descrição e do título seguem as mesmas duas fontes:
-específicas da transcrição primeiro, `default_hashtags` da conta para completar.
-A lista padrão de cada canal vive em `config/accounts.json` (campo
-`default_hashtags` da conta) — estender/ajustar lá, nada muda em código.
-Fallback genérico se a conta não tiver lista: #shorts #cortes #podcast #brasil
-#viral #noticias.
+As hashtags do bloco 4 da descrição seguem as mesmas fontes das `tags`:
+específicas da transcrição primeiro (pessoas, depois assunto), `default_hashtags`
+da conta para completar. O título **não** leva mais hashtags de nicho — ver
+seção Título (corte sem tag nenhuma, short só `#shorts`). A lista padrão de
+cada canal vive em `config/accounts.json` (campo `default_hashtags` da conta) —
+estender/ajustar lá, nada muda em código. Fallback genérico se a conta não
+tiver lista: #shorts #cortes #podcast #brasil #viral #noticias.
 
 Regras de uso das `default_hashtags` (pesquisa 2026):
 
@@ -121,11 +295,11 @@ Regras de uso das `default_hashtags` (pesquisa 2026):
   clip + as específicas da transcrição, dentro das quantidades do bloco 4.
 - Em short, `#shorts` vem PRIMEIRO no bloco: só as 3 primeiras hashtags da
   descrição aparecem acima do título no player.
-- Grafia minúscula e SEM acento (#politica, #eleicoes2026) — a versão sem
+- Grafia minúscula e SEM acento (#politica, #investimentos) — a versão sem
   acento domina a busca; não duplicar variantes acentuadas.
-- Hashtag de pessoa (#lula, #bolsonaro, #kimkataguiri, #gutozacarias,
-  #amandavettorazzo...) só quando a pessoa é citada/aparece na transcrição do
-  clip — nunca como padrão.
+- Hashtag de pessoa/entidade só quando ela é citada/aparece na transcrição do
+  clip — nunca como padrão. As hashtags de pessoa/tema típicas de cada nicho vivem em
+  `references/copy/<perfil>.md` e no `default_hashtags` da conta.
 - Hashtags classificam o tópico, não amplificam: a distribuição real vem de
   retenção e engajamento. Não sacrifique a copy por hashtag.
 
@@ -133,6 +307,11 @@ Regras de uso das `default_hashtags` (pesquisa 2026):
 
 Texto queimado na miniatura (thumbnail) do clip — **não** é o título, é
 linguagem de thumbnail: curta, emocional, alto contraste. Objeto no `clips.json`:
+
+**Miniatura e título NUNCA repetem a mesma mensagem — eles se complementam.** Ex.:
+thumb `"ELE ADMITIU"` + título `"O MOMENTO EM QUE ELE MUDOU O DISCURSO"` (a thumb dá o
+estopim, o título dá o contexto/consequência). Se `impact`/`hooks` disserem quase a
+mesma frase do `title`, reescreva um dos dois.
 
 ```json
 "thumbnail_text": {"impact": "PERDI R$ 40 MIL", "hooks": ["ELE ADMITIU TUDO!", "VOCÊ FARIA IGUAL?"]}
@@ -151,8 +330,11 @@ linguagem de thumbnail: curta, emocional, alto contraste. Objeto no `clips.json`
     TUDO!", "PERDEU R$ 40 MIL!", "ACABOU A AMIZADE!") OU (b) uma **pergunta
     aberta chamativa** com `?` (ex.: "ELE TENTOU UM GOLPE DE ESTADO?", "QUEM
     PAGOU A CONTA?", "VOCÊ FARIA IGUAL?").
-  - **Varie os tipos** (misture afirmação-`!` e pergunta-`?`); não repita o
-    `impact`.
+  - **Varie os tipos** — pense cada gancho numa categoria diferente (afirmação-
+    revelação, pergunta-curiosidade, consequência, contradição), mas a forma final
+    sempre cai em (a) afirmação com `!` ou (b) pergunta com `?` (a regra de
+    pontuação acima não muda). Não repita o `impact` nem o arquétipo entre os
+    próprios hooks.
 - Sem `#`, sem `<`/`>`. Acentos pt-BR OK (a fonte renderiza Ã/Ç/É).
 - Curiosidade HONESTA — a afirmação/resposta aparece no clip. **Nunca** prometer
   o que não aparece. Vale para short e corte.

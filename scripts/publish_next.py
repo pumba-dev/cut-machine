@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import cleanup, contracts, paths
+from core import accounts, cleanup, contracts, paths
 from core.cli import emit
 
 # status de clip prontos para upload (ainda nao publicados)
@@ -73,6 +73,15 @@ def main() -> None:
                        if d.is_dir() and (d / "clips.json").exists())
 
     order = _interleaved(video_ids, args.format)
+    if args.account:
+        # --account so deve forcar credencial de upload de clips que SAO
+        # daquela conta -- sem isso, a selecao (por formato/score/QA, cega a
+        # dono) pega o proximo clip pendente de QUALQUER conta e publica com
+        # a credencial errada. Clip sem publish.account (legado) so casa
+        # com a conta default.
+        default_id = accounts.get_account("youtube", None)["id"]
+        order = [(v, c) for v, c in order
+                 if ((c.get("publish") or {}).get("account") or default_id) == args.account]
     pending = [(v, c) for v, c in order if c.get("status") in PENDING]
     # trava de QA: so publica clip aprovado pelo qa-reviewer (qa.status == 'pass')
     nxt = next(((v, c) for v, c in pending if contracts.qa_passed(c)), None)

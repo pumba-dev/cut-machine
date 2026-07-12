@@ -16,7 +16,7 @@ Specs de render, metadados e publicação por formato/plataforma. Nomenclatura d
 ### Formato `corte` (vídeo padrão 16:9)
 - **Resolução:** 1920x1080 (16:9), sem crop e sem legenda de fala.
 - **Moldura de marca:** o vídeo é reduzido e centralizado dentro de uma moldura preta com rim amarelo (`#FFD93D`) e uma faixa inferior com o CTA `"Curta e se inscreva no canal"` (configurável por conta em `brand`). Padding, não crop — nada do vídeo é cortado. Spec em `references/estilo-legendas.md` ("Texto de marca do corte") + `core/render/branding.py`.
-- **Duração:** 480–900s (8–15 min); ideal 10–13 min. **Preferência forte por ≥8 min:** o YouTube só habilita mid-roll ads (monetização) em vídeos ≥8 min — cortes mais curtos reprovam em `FORMAT_RULES`. Ver `references/heuristicas-virais.md` para a regra de decisão de duração.
+- **Duração:** 480–600s (8–10 min); ideal 9–10 min. **Preferência forte por ≥8 min:** o YouTube só habilita mid-roll ads (monetização) em vídeos ≥8 min — cortes mais curtos reprovam em `FORMAT_RULES`. Ver `references/heuristicas-virais.md` para a regra de decisão de duração.
 - **Descrição:** estrutura e tamanho em `references/padrao-copy.md` (inclui o crédito/link do vídeo original, obrigatório quando o corte é de canal de terceiros); somar timestamps se houver capítulos.
 - **Hashtags:** **sem** `#shorts`; quantidade em `references/padrao-copy.md`.
 
@@ -24,7 +24,7 @@ Specs de render, metadados e publicação por formato/plataforma. Nomenclatura d
 
 | Campo | Limite da API | Recomendado |
 |---|---|---|
-| `title` | 100 caracteres; não aceita `<` nem `>` | gancho puro em CAIXA ALTA, sem categoria/hashtags (`references/padrao-copy.md`); alvo ≤ 70 (mobile trunca) |
+| `title` | 100 caracteres; não aceita `<` nem `>` | gancho puro em CAIXA ALTA; `corte` sem tag nenhuma, `short` só ` \| #shorts` (`references/padrao-copy.md`); alvo ≤ 70 (mobile trunca) |
 | `description` | 5000 **bytes** (UTF-8), não caracteres — a API conta bytes | curta e direta; links completos com `https://` |
 | `tags` | 500 caracteres somados (tag com espaço conta +2) | 10–15 tags (`references/padrao-copy.md`), soma ≤ 500; hashtags vão no fim da descrição/título, tags são campo separado |
 

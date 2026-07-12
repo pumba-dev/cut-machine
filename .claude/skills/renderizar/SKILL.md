@@ -33,7 +33,7 @@ Contrato: a ultima linha do stdout e JSON `{"ok": ...}`. Clip ja `rendered` nao 
 Spawne o subagente `qa-reviewer` via Task com o workspace. Ele roda ffprobe em cada `<clip_id>/<clip_id>.mp4` renderizado e valida:
 
 - short: 1080x1920, duracao do conteudo 30-165s (alvo media ~60s), legendas queimadas;
-- corte: 1920x1080, 480-900s (8-15 min);
+- corte: 1920x1080, 480-600s (8-10 min);
 - audio presente; duracao real ~ `contracts.expected_output_duration` = `(end - start) + intro + vinheta de fim` (`render.intro_duration_s` da capa ~1s do short + `render.outro_duration_s`, cada um 0 se ausente), tolerancia 0.5s.
 
 Clips reprovados ficam `failed` com `error` preenchido em `clips.json`. Ao final, marque a etapa `qa` como `done` em `state.json` — subagentes nao mexem em `state.json`: `python -c` com `core.state` (load, `set_stage(st, "qa", "done")`, save).

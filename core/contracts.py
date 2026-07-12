@@ -6,7 +6,7 @@ Donos por campo — ninguem sobrescreve campo de outro dono:
 - thumbnail-director (LLM, opt-in): bloco thumbnail_plan (frame/rosto/layout/prompt da IA)
 - render_clip.py: bloco render.*
 - qa-reviewer: bloco qa.* (qa.status pass/fail) + transicao failed/rejected
-- upload_clip.py: bloco publish.* (remote_id, url, published_at)
+- upload_clip.py: bloco publish.* (remote_id, url, published_at, thumbnail_set)
 - humano/orquestrador: transicao approved/rejected
 """
 import json
@@ -47,9 +47,9 @@ FORMAT_RULES = {
         "thumbnail_resolution": "1080x1920",
     },
     "corte": {
-        # >=8 min habilita mid-roll ads / monetizacao no YouTube; alvo 8-15 min.
+        # >=8 min habilita mid-roll ads / monetizacao no YouTube; alvo 8-10 min.
         "min_duration_s": 480.0,
-        "max_duration_s": 900.0,
+        "max_duration_s": 600.0,
         "resolution": "1920x1080",
         "crop": "none",
         "burn_captions": False,
@@ -122,16 +122,17 @@ def set_clip_qa(clip: dict, status: str, note: str | None = None) -> dict:
 
 
 def expected_output_duration(clip: dict) -> float:
-    """Duracao esperada do mp4 final = intro + conteudo (end-start) + vinheta de fim.
+    """Duracao esperada do mp4 final = intro + conteudo + vinheta de fim.
 
-    O render pode prepender uma intro (thumb congelada ~1s, so shorts opt-in;
-    `render.intro_duration_s`) e/ou colar uma vinheta de fim (outro;
-    `render.outro_duration_s`), ambas fora do check de conteudo. O arquivo final
-    e mais longo que `end - start` pela soma das duas. Fonte unica para os checks
-    de duracao (qa_backfill, qa-reviewer): comparam a duracao probeda contra este
-    valor (+-0.5s). Cada extra so entra quando de fato aplicado (campo gravado);
+    Conteudo = `render.content_duration_s` quando presente (jump-cut, Fase 7:
+    removeu pausas, conteudo fica MENOR que `end-start`) senao `end-start`
+    (retrocompativel, comportamento classico). O render pode prepender uma
+    intro (thumb congelada ~1s, so shorts opt-in; `render.intro_duration_s`)
+    e/ou colar uma vinheta de fim (outro; `render.outro_duration_s`), ambas
+    fora do check de conteudo. Fonte unica para os checks de duracao
+    (qa_backfill, qa-reviewer): comparam a duracao probeda contra este valor
+    (+-0.5s). Cada extra so entra quando de fato aplicado (campo gravado);
     ausente -> 0 (retrocompativel com clips antigos)."""
-    base = float(clip["end"]) - float(clip["start"])
     render = clip.get("render") or {}
 
     def _f(x) -> float:
@@ -140,6 +141,8 @@ def expected_output_duration(clip: dict) -> float:
         except (TypeError, ValueError):
             return 0.0
 
+    content = render.get("content_duration_s")
+    base = float(content) if content is not None else (float(clip["end"]) - float(clip["start"]))
     return base + _f(render.get("intro_duration_s")) + _f(render.get("outro_duration_s"))
 
 
@@ -304,24 +307,23 @@ def validate_plan(plan: dict) -> list[str]:
 
 def _title_problems(title: str, fmt: str) -> list[str]:
     """Adere ao formato de titulo (references/padrao-copy.md):
-    '<TEXTO CAIXA ALTA> | #tag #tag #tag'. Retorna lista de problemas (vazia=ok)."""
-    if " | " not in title:
-        return ["sem ' | ' (formato: TEXTO | #tag #tag #tag)"]
-    text_part, tags_part = title.rsplit(" | ", 1)
-    toks = tags_part.split()
-    tags = [w for w in toks if w.startswith("#")]
-    low = [t.lower() for t in tags]
+    corte = so o gancho (sem ' | ', sem hashtag); short = gancho + ' | #shorts'
+    (so essa hashtag). Retorna lista de problemas (vazia=ok)."""
     probs: list[str] = []
+    if fmt == "corte":
+        if " | " in title or "#" in title:
+            probs.append("corte nao leva tag no titulo (so o gancho)")
+        text_part = title
+    else:
+        if title.rstrip().lower().endswith("| #shorts"):
+            text_part = title.rsplit(" | ", 1)[0]
+        else:
+            probs.append("short precisa terminar em ' | #shorts' (so essa hashtag)")
+            text_part = title.split(" | ", 1)[0] if " | " in title else title
+        if "#" in text_part:
+            probs.append("hashtag antes do ' | '")
     if text_part.upper() != text_part:
         probs.append("texto nao esta em CAIXA ALTA")
-    if "#" in text_part:
-        probs.append("hashtag antes do ' | '")
-    if len(tags) != 3 or len(toks) != 3:
-        probs.append(f"precisa de exatamente 3 hashtags apos ' | ' (tem {len(tags)})")
-    if fmt == "short" and "#shorts" not in low:
-        probs.append("short sem #shorts no titulo")
-    if fmt == "corte" and "#shorts" in low:
-        probs.append("corte nao leva #shorts")
     return probs
 
 
@@ -341,9 +343,8 @@ def lint_copy(plan: dict) -> list[str]:
             continue  # sem copy, ou tipo errado (validate_plan ja reporta)
         fmt = clip.get("format")
 
-        # Titulo (revisado 2026-07-08 v2): "<TEXTO CAIXA ALTA> | #tag #tag #tag".
-        # Sem categoria; 3 hashtags (short: #shorts + 2; corte: 3) das
-        # default_hashtags da conta. Limite duro de 100 chars: validate_plan (erro).
+        # Titulo: corte = so o gancho em CAIXA ALTA (sem tag); short = gancho
+        # + " | #shorts" (so essa hashtag). Limite duro de 100 chars: validate_plan (erro).
         for p in _title_problems(title, fmt):
             warnings.append(f"{cid}: title {p}")
 
@@ -355,7 +356,7 @@ def lint_copy(plan: dict) -> list[str]:
                 warnings.append(
                     f"{cid}: title_alts com {len(clean)} variantes (pool A/B recomenda 6-10)")
             if any(_title_problems(a, fmt) for a in clean):
-                warnings.append(f"{cid}: alguma variante fora do formato 'TEXTO | #tag #tag #tag'")
+                warnings.append(f"{cid}: alguma variante fora do formato do title (corte: sem tag; short: '| #shorts')")
             pool = [t.lower() for t in [title] + clean]
             if len(set(pool)) != len(pool):
                 warnings.append(f"{cid}: variantes de title duplicadas (pool A/B deve ser distinto)")

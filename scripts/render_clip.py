@@ -161,6 +161,12 @@ def main() -> None:
             render_block["outro_duration_s"] = info["outro_duration_s"]
         if info.get("transform"):
             render_block["transform"] = info["transform"]
+        if info.get("reframe"):
+            render_block["reframe"] = info["reframe"]
+        if info.get("jumpcut"):
+            render_block["jumpcut"] = info["jumpcut"]
+        if info.get("content_duration_s") is not None:
+            render_block["content_duration_s"] = info["content_duration_s"]
         if info.get("thumbnail_path") is not None:
             render_block["thumbnail_path"] = _rel(info["thumbnail_path"])
             render_block["thumbnail_ts"] = round(float(info["thumbnail_ts"]), 3)

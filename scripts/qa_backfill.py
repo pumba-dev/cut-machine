@@ -6,7 +6,8 @@ publicar. Serve para (1) retrofit da fila ja renderizada antes da trava de QA
 existir e (2) rede de seguranca / re-verificacao em massa.
 
 Por clip com status 'rendered':
-  - probe o mp4; confere resolucao exata, duracao (end-start +-0.5s) e audio;
+  - probe o mp4; confere resolucao exata, duracao (contracts.expected_output_duration,
+    +-0.5s -- end-start ou render.content_duration_s se o jump-cut mudou a duracao) e audio;
   - audio_risk == true -> status 'rejected' + qa.fail (mesmo com tecnica ok);
   - tudo ok -> qa.status 'pass' (mantem 'rendered');
   - check falhou -> status 'failed' + error + qa.fail.

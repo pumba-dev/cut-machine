@@ -29,9 +29,9 @@ _WHITE = "&H00FFFFFF"
 # o short p/ o impacto longo caber em poucas linhas sem colidir com os chips.
 _FONT_SIZES = {
     "corte": {"impact": 96, "hook": 46, "imp_out": 7, "chip_pad": 13},
-    "short": {"impact": 220, "hook": 90, "imp_out": 13, "chip_pad": 24},
+    "short": {"impact": 170, "hook": 46, "imp_out": 7, "chip_pad": 13},
 }
-_DEFAULT_SIZES = {"impact": 170, "hook": 76, "imp_out": 10, "chip_pad": 18}
+_DEFAULT_SIZES = {"impact": 170, "hook": 60, "imp_out": 7, "chip_pad": 13}
 
 
 def _t(value: float) -> str:
@@ -79,7 +79,7 @@ def _content(clip: dict) -> tuple[str, list[str]]:
         impact = _first_words(clip.get("hook_text") or "") or _title_miolo(clip)
     if not impact:
         impact = "ASSISTA ATE O FIM"
-    hooks = hooks[:3]
+    hooks = hooks[:2]
     return impact.upper(), [h.upper() for h in hooks]
 
 
@@ -95,7 +95,7 @@ def build_thumb_ass(clip: dict, width: int, height: int, region: str = "full") -
     (Alignment 8, ocupa boa parte da largura, quebra em 2 linhas se longa) +
     os ganchos como CHIPS distintos empilhados na FAIXA INFERIOR — cada gancho
     em Dialogue proprio com BorderStyle=3 (caixa opaca), cores ALTERNANDO
-    preto/amarelo e folga vertical entre eles, para o usuario ler 3 frases
+    preto/amarelo e folga vertical entre eles, para o usuario ler 2 frases
     SEPARADAS e longe da frase principal (nao mais um bloco unico embaixo dela).
 
     `region` confina o texto a uma COLUNA (layout lateral do corte 16:9): "left"
@@ -106,7 +106,7 @@ def build_thumb_ass(clip: dict, width: int, height: int, region: str = "full") -
     s = _FONT_SIZES.get(fmt, _DEFAULT_SIZES)
     impact, hooks = _content(clip)
     if region != "full":  # layout lateral (corte): coluna estreita -> so 2 chips
-        hooks = hooks[:2]
+        hooks = hooks[:1]
     impact_fs, hook_fs = s["impact"], s["hook"]
     imp_out, chip_pad = s["imp_out"], s["chip_pad"]
     top_margin = round(height * 0.035)

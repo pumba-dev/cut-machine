@@ -2,12 +2,18 @@
 
 Tempos sao rebased (t - clip.start) porque o ffmpeg corta com -ss antes de
 -i e o output comeca em t=0. Estilo base: Arial Black 110 @ PlayRes
-1080x1920, Outline 8, Alignment 2 (baixo-centro), MarginV 690 (sobre a
-janela do video da moldura fixa do short — core.render.short_frame).
+1080x1920, Outline 8, Alignment 2 (baixo-centro), MarginV 460 (perto da base
+da janela do video da moldura fixa do short, que agora vai quase ate o fim do
+canvas — ver core.render.short_frame; margem de seguranca acima da faixa CTA
+opaca da arte, que comeca em y~1545).
 
 Cores por falante: um Style por falante (Cap0..Cap4, paleta fixa), palavra
 usa o campo `spk` gravado pela diarizacao (core.diarize). Transcript sem
 diarizacao cai no estilo Cap (branco) — retrocompatibilidade total.
+
+Animacao (pop-in): cada grupo de palavras nasce menor e sobe de opacidade
+(`\\fad` + `\\t` escalando `\\fscx`/`\\fscy`) — mais movimento de pixels
+originais = mais divergencia visual da fonte, alem de reforcar a leitura.
 """
 
 # PrimaryColour em &HAABBGGRR (BGR!). Ordem = prioridade do falante
@@ -21,10 +27,13 @@ SPEAKER_COLOURS = [
     "&H0000A5FF",  # spk 4: laranja #FFA500
 ]
 
-# MarginV 690: legendas sobre a JANELA do video (y658-1301 da moldura fixa),
-# nao mais no centro-baixo do canvas antigo (fundo blur). Ver core/render/short_frame.py.
+# MarginV 460: baseline perto do fim da janela nova (quase o canvas inteiro),
+# com folga sobre a faixa CTA opaca da arte (y~1545). Ver core/render/short_frame.py.
 _STYLE_FMT = ("Style: {name},Arial Black,110,{colour},&H0000FFFF,&H00000000,"
-              "&H96000000,-1,0,0,0,100,100,0,0,1,8,0,2,60,60,690,1")
+              "&H96000000,-1,0,0,0,100,100,0,0,1,8,0,2,60,60,460,1")
+
+# Pop-in: nasce a 78% da escala e fade-in de 70ms, cresce ate 100% em 130ms.
+_POP_TAG = r"{\fad(70,0)\fscx78\fscy78\t(0,130,\fscx100\fscy100)}"
 
 
 def _ass_header() -> str:
@@ -92,7 +101,7 @@ def ass_time(t: float) -> str:
     return f"{int(h)}:{int(m):02}:{s:05.2f}"
 
 
-def build_ass(clip: dict, transcript: dict, speed: float = 1.0) -> str:
+def build_ass(clip: dict, transcript: dict, speed: float = 1.0, time_map=None) -> str:
     """Gera o conteudo do arquivo .ass para as palavras dentro do clip.
 
     Seleciona palavras com start em [clip.start, clip.end), rebase para o
@@ -102,10 +111,22 @@ def build_ass(clip: dict, transcript: dict, speed: float = 1.0) -> str:
     `speed` (core.render.transform): quando o video e acelerado por `setpts`
     (speed != 1.0), os tempos rebased sao divididos por `speed` para a legenda
     acompanhar o video. speed=1.0 (default) e no-op.
+
+    `time_map` (core.render.timemap.TimeMap, opt-in via core.render.jumpcut):
+    quando o jump-cut removeu pausas, os tempos rebased passam por
+    `time_map.clamp_to_new()` ANTES do `/speed` -- reposiciona a legenda no
+    video ja cortado. None (default) = identidade (sem jump-cut).
     """
     start = clip["start"]
     end = clip["end"]
     sp = speed if speed and speed > 0 else 1.0
+
+    def _local(t: float) -> float:
+        local = t - start
+        if time_map is not None:
+            local = time_map.clamp_to_new(local)
+        return local / sp
+
     words = [
         w
         for seg in transcript["segments"]
@@ -114,9 +135,9 @@ def build_ass(clip: dict, transcript: dict, speed: float = 1.0) -> str:
     ]
     events: list[str] = []
     for group in group_words(words):
-        ev_start = ass_time((group[0]["start"] - start) / sp)
-        ev_end = ass_time((min(group[-1]["end"], end) - start) / sp)
+        ev_start = ass_time(_local(group[0]["start"]))
+        ev_end = ass_time(_local(min(group[-1]["end"], end)))
         style = _style_for(group[0].get("spk"))
-        text = " ".join(w["w"] for w in group).upper()
+        text = _POP_TAG + " ".join(w["w"] for w in group).upper()
         events.append(f"Dialogue: 0,{ev_start},{ev_end},{style},,0,0,0,,{text}")
     return ASS_HEADER + "\n".join(events) + "\n"

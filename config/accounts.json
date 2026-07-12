@@ -7,6 +7,7 @@
       "label": "Missão no Nordeste",
       "channel_name": "Missão no Nordeste",
       "niche": "Cortes de política do partido Missão (fundado pelo MBL): o presidenciável Renan Santos e os porta-vozes do partido (Kim Kataguiri, Guto Zacarias, Amanda Vettorazzo). Direita liberal / terceira via, eleições 2026, conteúdo pt-BR.",
+      "copy_profile": "politica",
       "credentials_dir": "secrets/youtube/principal",
       "default": true,
       "daily_upload_limit": 100,
@@ -17,21 +18,42 @@
         "corte_outro": "assets/corte-end/principal.mp4"
       },
       "transform": {
-        "speed": 1.02,
-        "pitch_semitones": 0.3,
+        "speed": 1.05,
+        "pitch_semitones": 0.85,
         "eq": true,
+        "eq_notch": true,
+        "noise": 10,
         "music_dir": "assets/music/principal",
         "music_volume": 0.05,
-        "music_lufs": -16,
-        "color": { "contrast": 1.05, "saturation": 1.1, "gamma": 0.98 },
+        "music_lufs": -20,
+        "color": { "contrast": 1.12, "saturation": 1.15, "gamma": 0.95 },
         "zoom": 1.2,
-        "jitter": 0.35
+        "flip": true,
+        "jitter": 0.6
       },
       "thumbnail": {
         "face_aware": true,
         "intro_short": true,
-        "intro_duration_s": 1.0,
+        "intro_duration_s": 0.1,
         "rembg_model": "u2net"
+      },
+      "reframe": {
+        "enabled": true,
+        "min_segment_s": 1.2,
+        "margin": 0.35,
+        "min_crop_h": 0.7,
+        "fps": 5.0,
+        "max_frames": 4000,
+        "min_confidence": 0.15,
+        "cutaway": true,
+        "hook_punch": true,
+        "sfx_dir": "",
+        "sfx_volume": 0.5
+      },
+      "jumpcut": {
+        "enabled": true,
+        "min_gap_s": 1.2,
+        "buffer_s": 0.15
       },
       "default_hashtags": [
         "#política",
@@ -39,6 +61,72 @@
         "#direita",
         "#renansantos",
         "#partidomissao"
+      ]
+    },
+    {
+      "platform": "youtube",
+      "id": "negocios",
+      "label": "Economia de Bits",
+      "channel_name": "Economia de Bits",
+      "niche": "Cortes de podcasts, palestras e entrevistas sobre economia, mercado financeiro e negócios: investimentos, educação financeira e empreendedorismo, em linguagem direta e sem enrolação (pt-BR). Estética 8-bit pixel art, navy + verde neon.",
+      "copy_profile": "financas",
+      "credentials_dir": "secrets/youtube/negocios",
+      "default": false,
+      "daily_upload_limit": 100,
+      "brand": {
+        "short_frame": "assets/short-frame/negocios.png",
+        "corte_frame": "assets/corte-frame/negocios.png",
+        "short_outro": "assets/short-end/negocios.mp4",
+        "corte_outro": "assets/corte-end/negocios.mp4",
+        "accent_color": "#39FF14"
+      },
+      "transform": {
+        "speed": 1.05,
+        "pitch_semitones": 0.85,
+        "eq": true,
+        "eq_notch": true,
+        "noise": 10,
+        "music_dir": "assets/music/negocios",
+        "music_volume": 0.05,
+        "music_lufs": -20,
+        "color": { "contrast": 1.12, "saturation": 1.15, "gamma": 0.95 },
+        "zoom": 1.2,
+        "flip": true,
+        "jitter": 0.6
+      },
+      "thumbnail": {
+        "face_aware": true,
+        "intro_short": true,
+        "intro_duration_s": 0.1,
+        "rembg_model": "u2net"
+      },
+      "reframe": {
+        "enabled": true,
+        "min_segment_s": 1.2,
+        "margin": 0.35,
+        "min_crop_h": 0.7,
+        "fps": 5.0,
+        "max_frames": 4000,
+        "min_confidence": 0.15,
+        "cutaway": true,
+        "hook_punch": true,
+        "sfx_dir": "",
+        "sfx_volume": 0.5
+      },
+      "jumpcut": {
+        "enabled": true,
+        "min_gap_s": 1.2,
+        "buffer_s": 0.15
+      },
+      "default_hashtags": [
+        "#dinheiro",
+        "#financas",
+        "#investimentos",
+        "#educacaofinanceira",
+        "#mercadofinanceiro",
+        "#empreendedorismo",
+        "#negocios",
+        "#economia"
       ]
     }
   ]

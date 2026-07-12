@@ -150,7 +150,7 @@ flowchart TD
 
 - **short** — 30–165 s de conteúdo (alvo média ~60 s; teto reserva ~15 s p/ intro+vinheta → final ≤180 s, teto do Shorts), 1080×1920, sem crop. O vídeo entra numa janela transparente da **arte PNG
   da conta** (que fica *por cima*); legendas ASS queimadas por último.
-- **corte** — 480–900 s (8–15 min; ≥8 min para monetização), 1920×1080, sem legenda queimada.
+- **corte** — 480–600 s (8–10 min; ≥8 min para monetização), 1920×1080, sem legenda queimada.
   Vídeo na janela + arte PNG por cima. Fallback sem PNG: moldura gerada preto+amarelo com CTA.
 
 Compositing (ambos): `canvas preto → vídeo na janela → arte PNG por cima → (short) legendas`.
@@ -244,14 +244,23 @@ execução seguinte.
 Registro no **Agendador de Tarefas do Windows** (rodar 3× ao dia, formato short):
 
 ```powershell
-# cria a tarefa (ajuste o caminho do python e do projeto)
+# cria a tarefa (ajuste o caminho do projeto); sempre via scripts/run_hidden.vbs
+# (WScript.Shell.Run com WindowStyle=0) — sem ele o Agendador abre uma janela
+# de cmd visível a cada disparo (LogonType=InteractiveToken roda na sessão
+# interativa do usuário logado, e todo processo console aloca janela ali).
 schtasks /create /tn "cut-machine\drip-short" /sc daily /st 09:00 /ri 240 /du 12:00 ^
-  /tr "powershell -NoProfile -Command \"cd C:\Users\eduar\github\social-accounts-agent; python scripts/publish_next.py --format short\""
+  /tr "wscript.exe //B \"C:\Users\eduar\github\social-accounts-agent\scripts\run_hidden.vbs\" \"C:\Users\eduar\github\social-accounts-agent\scripts\publish_short.cmd\""
 
 # um corte por dia às 18h
 schtasks /create /tn "cut-machine\drip-corte" /sc daily /st 18:00 ^
-  /tr "powershell -NoProfile -Command \"cd C:\Users\eduar\github\social-accounts-agent; python scripts/publish_next.py --format corte\""
+  /tr "wscript.exe //B \"C:\Users\eduar\github\social-accounts-agent\scripts\run_hidden.vbs\" \"C:\Users\eduar\github\social-accounts-agent\scripts\publish_corte.cmd\""
 ```
+
+Pra mudar o `/tr` de uma tarefa já existente, não use `schtasks /change /tr` — ele
+pede a senha do usuário toda vez, mesmo em logon interativo sem senha salva.
+Exporte com `schtasks /query /tn "<nome>" /xml`, edite só `<Command>`/`<Arguments>`
+e reimporte com `schtasks /create /xml <arquivo> /tn "<nome>" /f` (preserva
+`LogonType` e agenda, sem prompt).
 
 Cheque antes de subir o que ele publicaria, sem gastar quota:
 

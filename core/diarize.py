@@ -78,7 +78,7 @@ def ensure_models() -> None:
         _download(_EMB_URL, EMB_MODEL)
 
 
-def _extract_wav16k(video: Path, wav: Path) -> None:
+def extract_wav16k(video: Path, wav: Path) -> None:
     """Extrai audio mono 16kHz PCM s16le com ffmpeg (formato do sherpa-onnx)."""
     cmd = ["ffmpeg", "-v", "error", "-i", str(video),
            "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
@@ -90,7 +90,7 @@ def _extract_wav16k(video: Path, wav: Path) -> None:
         raise RuntimeError(f"ffmpeg falhou ao extrair audio (exit {proc.returncode}): {tail}")
 
 
-def _read_wav(wav: Path) -> np.ndarray:
+def read_wav16k_mono(wav: Path) -> np.ndarray:
     """Le wav mono 16kHz s16le como float32 1-D em [-1, 1] (stdlib wave)."""
     with wave.open(str(wav), "rb") as wf:
         if wf.getframerate() != 16000 or wf.getnchannels() != 1 or wf.getsampwidth() != 2:
@@ -162,8 +162,8 @@ def diarize_turns(video: Path, num_speakers: int = -1) -> list[dict]:
     ensure_models()
     wav = video.parent / "audio16k.tmp.wav"
     try:
-        _extract_wav16k(video, wav)
-        audio = _read_wav(wav)
+        extract_wav16k(video, wav)
+        audio = read_wav16k_mono(wav)
     finally:
         wav.unlink(missing_ok=True)
 

@@ -11,7 +11,7 @@ O que você planeja é **executado pelo render** (`core/render/thumbnail_local.p
 ## Entrada (via prompt do orquestrador)
 
 - `video_id` (plano em `video-output/<video_id>/clips.json`).
-- `account_id` (opcional; sem ele, use a conta `"default": true`).
+- `account_id` — a conta do vídeo. Se o orquestrador não passar, **leia de `clips.json` no campo `publish.account`** (gravado pelo clip-scout). Nunca assuma a conta `"default"` (define se a conta é opt-in de thumb face-aware e o layout — conta errada = plano de thumb errado).
 
 ## Antes de escrever
 

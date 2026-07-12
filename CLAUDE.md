@@ -10,9 +10,10 @@ usuário e **retomar** pipelines interrompidos. Você nunca toca em tokens/secre
 ## 2. Pipeline (máquina de estados)
 
 ```
-download -> transcribe -> faces* -> plan -> copy -> [thumbnail-director*] -> render -> qa -> publish
+download -> transcribe -> faces* -> speaker-track* -> plan -> copy -> [thumbnail-director*] -> render -> qa -> publish
 ```
-*`faces` e `thumbnail-director` são **opt-in por conta** (bloco `thumbnail` em `accounts.json`); conta sem eles pula direto (comportamento clássico, thumb ASS local).
+*`faces`, `speaker-track` e `thumbnail-director` são **opt-in por conta**; conta sem eles pula direto
+(comportamento clássico: thumb ASS local, crop central estático sem reframe).
 
 - Estado **por fase**: `video-output/<video_id>/state.json` (`core.state`, status `pending|running|partial|done|failed`).
 - Estado **por clip**: `clips.json.clips[].status` (`planned -> approved -> rendering -> rendered -> queued -> uploading -> published`; desvios `rejected`/`failed` com `error` obrigatório).
@@ -32,8 +33,9 @@ download -> transcribe -> faces* -> plan -> copy -> [thumbnail-director*] -> ren
 | Seleção de momentos virais, start/end finos | **clip-scout** (LLM) |
 | Títulos, descrições, tags | **copywriter** (LLM) |
 | Detecção de rosto/emoção + host (`faces.json`) | `scripts/analyze_faces.py` (opencv/onnx CPU; opt-in) |
+| Rastreio do falante ativo por tempo, AV-sync boca×áudio (`speaker_track.json`) | `scripts/track_speaker.py` (opencv/onnx CPU; opt-in) |
 | Escolha do frame/rosto/layout + prompt da thumb via IA | **thumbnail-director** (LLM; opt-in) |
-| Geração do .ass + corte/crop/burn/encode + moldura + miniatura (composite local **default** / ASS fallback) + intro (thumb ~1s, só shorts) + vinheta de fim | `scripts/render_clip.py` (ffmpeg; `short_frame.py` + `corte_frame.py` + `branding.py` + `thumbnail.py` + `thumbnail_local.py` + `intro.py` + `outro.py`) |
+| Geração do .ass + corte/crop/burn/encode + moldura + reframe dinâmico + progress bar + miniatura (composite local **default** / ASS fallback) + intro (thumb ~1s, só shorts) + vinheta de fim + jump-cut | `scripts/render_clip.py` (ffmpeg; `short_frame.py` + `corte_frame.py` + `frame_common.py` + `branding.py` + `reframe.py` + `jumpcut.py` + `sfx.py` + `thumbnail.py` + `thumbnail_local.py` + `intro.py` + `outro.py`) |
 | Validação técnica do render | **qa-reviewer** (LLM orquestrando ffprobe) |
 | OAuth + upload | `scripts/auth.py` / `scripts/upload_clip.py` |
 | Retomada, checkpoints, retry | **você** (orquestrador) |
@@ -45,8 +47,10 @@ download -> transcribe -> faces* -> plan -> copy -> [thumbnail-director*] -> ren
 - **Contrato de script**: todo CLI em `scripts/` é idempotente (emite `{"ok": true, "skipped": true}` se já feito), imprime **UMA linha JSON como último output** no stdout (`core.cli.emit`), atualiza `state.json` sozinho, I/O sempre UTF-8. Você lê só essa última linha.
 - `clips.json` é o **único contrato** entre subagentes e scripts — nenhum dado de clip vive fora dele. Dono por campo (ver `core/contracts.py`): clip-scout cria o clip + análise; copywriter preenche copy (`title`/`description`/`tags`/`thumbnail_text`); **thumbnail-director preenche `thumbnail_plan`** (frame/rosto/layout da thumb compositada; opt-in); `render_clip.py` preenche `render.*`; **qa-reviewer preenche `qa.*`** (`qa.status` pass/fail); `upload_clip.py` preenche `publish.*`; humano/você transiciona `approved/rejected`. **Ninguém sobrescreve campo de outro dono.**
 - Cada clip tem subpasta própria `video-output/<video_id>/<clip_id>/` com `<clip_id>.mp4`, `<clip_id>.ass` (só shorts), `<clip_id>.border.ass` (só cortes **sem arte PNG** — fallback da moldura gerada), `<clip_id>.thumb.jpg` (miniatura, ambos os formatos) e `metadata.json` — este último é **derivado** de `clips.json` (gerado por `render_clip.py`, regenerado por `upload_clip.py` após publish). Ninguém edita `metadata.json` à mão; subagentes LLM não escrevem nele.
-- Formatos (`core.contracts.FORMAT_RULES`): `short` 30–165s (conteúdo; alvo média ~60s, reserva ~15s p/ intro+vinheta → final ≤180s, teto do Shorts), 1080x1920, sem crop (vídeo numa janela com a arte PNG da conta **por cima** — janela transparente; `core/render/short_frame.py`; substituiu o fundo blur), legendas queimadas; `corte` 480–900s (8–15 min, ≥8 min para monetização), 1920x1080, sem burn (vídeo numa janela com a arte PNG por cima — `core/render/corte_frame.py`; fallback sem PNG: moldura gerada preto+amarelo de `branding.py`). **Compositing:** canvas preto → vídeo na janela → arte PNG por cima → (short) legendas queimadas por último. Toda a marca/CTA vem embutida no PNG.
-- **Camada anti-detecção** (`core/render/transform.py`, **opt-in por conta**): bloco `transform` em `config/accounts.json` (irmão de `brand`) torna cada render tecnicamente distinto do original (quebra Content ID) e distinto entre si (reduz reused-content). Técnicas: `speed` (nudge), `pitch_semitones`, `eq` (EQ+compressor), `music_dir`/`music_volume` (música de fundo com duck reverso — voz sempre prioritária), `color`/`lut` (grade), `zoom` (crop-in). `jitter` (0–1) aplica variação **determinística por clip** (seed = `clip_id`, idempotente); só parâmetros ativos jitteram ("off" continua off). **Invariantes preservados de propósito**: duração (lê `dur*speed` da fonte, saída travada em `dur`) e resolução (crop-in antes do scale) não mudam → **QA não precisa mudar**. Bloco ausente = tudo-off = zero regressão. Efetivos registrados em `render.transform`. Short com `speed≠1` reescala os tempos do `.ass` (`build_ass(..., speed=)`). Faixas de música **precisam ser livres de claim** (`assets/music/<conta>/`).
+- Formatos (`core.contracts.FORMAT_RULES`): `short` 30–165s (conteúdo; alvo média ~60s, reserva ~15s p/ intro+vinheta → final ≤180s, teto do Shorts), 1080x1920, **crop-to-fill** (vídeo escalado até cobrir a janela + excesso lateral cortado — sem barra preta; arte PNG da conta **por cima**, janela transparente; `core/render/short_frame.py`; substituiu o letterbox antigo), legendas queimadas + progress bar (todo short); `corte` 480–600s (8–10 min, ≥8 min para monetização), 1920x1080, crop-to-fill (vídeo numa janela quase do tamanho do canvas com a arte PNG por cima — `core/render/corte_frame.py`; fallback sem PNG: moldura gerada preto+amarelo de `branding.py`, sem crop). **Compositing:** canvas preto → vídeo crop-to-fill na janela (ou cortes de câmera do reframe, opt-in) → arte PNG por cima → (short) progress bar + legendas queimadas por último. Toda a marca/CTA vem embutida no PNG. Mecânica de encaixe compartilhada: `core/render/frame_common.py` (`build_video_stage`, usado por ambos os formatos e pelo reframe).
+- **Camada anti-detecção** (`core/render/transform.py`, **opt-in por conta**): bloco `transform` em `config/accounts.json` (irmão de `brand`) torna cada render tecnicamente distinto do original (quebra Content ID) e distinto entre si (reduz reused-content). Técnicas: `speed` (nudge), `pitch_semitones`, `eq` (EQ+compressor), `music_dir`/`music_volume` (música de fundo com duck reverso — voz sempre prioritária, é o lever mais forte contra fingerprint de áudio), `color`/`lut` (grade), `zoom` (crop-in), `flip` (hflip — espelha horizontalmente; combinado com reframe, espelha o x do crop também). `jitter` (0–1) aplica variação **determinística por clip** (seed = `clip_id`, idempotente); só parâmetros ativos jitteram ("off" continua off). **Invariantes preservados de propósito**: duração (lê `dur*speed` da fonte, saída travada em `dur`) e resolução (crop-in antes do scale) não mudam → **QA não precisa mudar** (exceto com jump-cut, ver abaixo). Bloco ausente = tudo-off = zero regressão. Efetivos registrados em `render.transform`. Short com `speed≠1` reescala os tempos do `.ass` (`build_ass(..., speed=)`). Faixas de música **precisam ser livres de claim** (`assets/music/<conta>/`).
+- **Reframe dinâmico** (`core/render/reframe.py` + `core/faces/speaker_track.py`, **opt-in por conta**, bloco `reframe` em `accounts.json`): corta a "câmera" ao redor de quem está falando em vez do crop-to-fill central estático — o sinal mais forte contra Content ID/reused-content (recompõe o quadro, não só filtra pixel). Fase `speaker-track` (`scripts/track_speaker.py`) reamostra o vídeo em fps alto **só dentro dos turnos de fala** (reconstruídos do `spk` por palavra do transcript, sem re-diarizar), detecta rostos (YuNet) + rastreia por IoU dentro do turno, mede movimento da região da boca (diff de pixel entre frames) e correlaciona (janela deslizante) com a envolvente RMS do áudio — o rosto mais sincronizado é o falante ativo daquele turno. Clusteriza os vencedores de todos os turnos (embedding SFace, mesmo algoritmo de `core/faces/cluster.py`) para uma identidade global consistente (0 = quem mais aparece falando). Grava `video-output/<id>/speaker_track.json` (derivado, apagado no cleanup); degrada com segurança (sem correlação confiável → `degraded: true`, render cai no crop central). `render.py` monta cortes de plano (trim+crop+concat, `core/render/frame_common.py`) a partir dos segmentos resolvidos; trechos sem falante identificado usam crop central de fallback (nunca deixa buraco na timeline). Sub-recursos (mesmo bloco `reframe`): `cutaway` (corta pro rosto de quem ouve nas pausas curtas do falante ativo), `hook_punch` (zoom breve no timestamp do gancho/`thumbnail_ts` do clip), `sfx_dir`/`sfx_volume` (stinger sonoro em cada troca de plano, faixa livre de claim como `music_dir`). Registrado em `render.reframe`. Supersede `transform.zoom` quando produz cortes reais (não cropa duas vezes).
+- **Progress bar + legenda animada** (`core/render/short_frame.py`/`captions.py`, **todo short, não opt-in**): barra fina no topo que enche esquerda→direita ao longo do clip (técnica de overlay com `x` dinâmico — `drawbox` **não** suporta `t` de verdade em `w`/`h`, a opção `thickness` do próprio filtro sombreia a variável de tempo; ver comentário em `short_frame.py`) e legendas com pop-in (fade+scale via tags ASS `\fad`/`\t`).
 - **Vinheta de fim** (`core/render/outro.py`, **opt-in por conta**): `brand.short_outro`/`brand.corte_outro` em `config/accounts.json` (mp4 por conta em `assets/short-end/<conta>.mp4` / `assets/corte-end/<conta>.mp4`; vazio = sem vinheta, retrocompatível). Colada ao **final** do clip **depois** do render+validação do conteúdo — o check de duração do conteúdo roda antes, isolado. Normaliza a arte (fit+pad para a resolução do formato, 30fps, yuv420p, áudio 48k estéreo AAC) via concat filter (re-encode), então a arte pode vir em qualquer resolução/fps que ela é encaixada sem distorcer/cortar. **Só a duração cresce** (resolução/áudio intactos). Falha no append é **fatal** (marca de fim é requisito, ao contrário da miniatura). Duração acrescentada em `render.outro_duration_s`.
 - **Miniatura inteligente** (**opt-in por conta**, bloco `thumbnail` em `accounts.json`; `core/render/thumbnail_config.py`). Três alavancas independentes:
   - **Detecção de rosto/emoção** (fase `faces`, `scripts/analyze_faces.py` + `core/faces/`): amostra frames do source em **CPU** (opencv YuNet+SFace+FER via onnx, modelos em `models/faces/`, padrão diarize: download sob demanda + degrada), agrupa identidades por embedding e marca o **host** (quem mais aparece). Gera `video-output/<id>/faces.json` (derivado; apagado com a pasta no cleanup). Falha → `faces.json` degradado + stage `done`, pipeline segue.
@@ -55,7 +59,8 @@ download -> transcribe -> faces* -> plan -> copy -> [thumbnail-director*] -> ren
     2. **`local`** (`thumbnail.py`): thumb ASS simples (crop central) — fallback final quando o composite falha ou a conta não é `face_aware`.
     - Fluxo de geração via IA (gpt-image-1) foi **removido** (custo + não fazia 9:16 nativo + fidelidade pior que o recorte real). Se um dia quiser IA, um provedor com 9:16 nativo + foto de input (Imagen/Flux/Ideogram) entraria como novo tier aqui.
   - **Intro (capa do feed)** (`core/render/intro.py`, `intro_short: true`, **só shorts**): cola a thumb como ~1s congelado no **início** do short (o feed do Shorts usa o 1º frame como capa). **Best-effort não-fatal** (≠ outro); duração acrescentada em `render.intro_duration_s`.
-- **Duração esperada do mp4 final = `(end-start) + intro_duration_s + outro_duration_s`** (`contracts.expected_output_duration`, fonte única dos checks de `qa_backfill.py` e qa-reviewer; cada extra entra só quando aplicado). O check **interno** do render valida o **conteúdo isolado** (`end-start`, antes de intro/outro).
+- **Jump-cut** (`core/render/jumpcut.py`, **opt-in por conta**, bloco `jumpcut` em `accounts.json`, off por padrão): remove pausas longas entre palavras (gaps do transcript, sem diarização/CV nova) — corte seco com um respiro (`buffer_s`) em cada ponta. **Única fase que muda a duração do clip** (todas as outras preservam `end-start` por construção); por isso é a última da sequência e roda isolada. Supersede `transform.speed` (evita compor duas alterações de timeline). Trechos mantidos viram os mesmos cortes de plano do reframe (`core/render/frame_common.py`) — quando os dois estão ativos, jump-cut define OS PEDAÇOS que sobrevivem e reframe define o CROP de cada um (ponto médio). Áudio recebe o mesmo trim+concat (`atrim`/`concat`) nos mesmos pontos — sem `atempo` por pedaço, então áudio e vídeo ficam trivialmente sincronizados. Legendas remapeadas pelo mesmo corte (`core/render/timemap.py`, `TimeMap`). Duração final gravada em `render.content_duration_s` e `render.jumpcut` (pieces/removed_s).
+- **Duração esperada do mp4 final = conteúdo + `intro_duration_s` + `outro_duration_s`** (`contracts.expected_output_duration`, fonte única dos checks de `qa_backfill.py` e qa-reviewer; cada extra entra só quando aplicado). Conteúdo é `end-start`, OU `render.content_duration_s` se o jump-cut mudou a duração (fica **menor** que `end-start`). O check **interno** do render valida o **conteúdo isolado** (antes de intro/outro).
 
 ## 5. Comandos canônicos
 
@@ -64,6 +69,7 @@ python scripts/download.py     --url <URL>
 python scripts/transcribe.py   --video-id <id> [--model large-v3] [--device auto|cuda|cpu] [--compute int8] [--no-diarize] [--speakers N]
 python scripts/diarize.py      --video-id <id> [--speakers N] [--force]
 python scripts/analyze_faces.py --video-id <id> [--account <id>] [--interval 2.0] [--max-frames 2500] [--force]
+python scripts/track_speaker.py --video-id <id> [--account <id>] [--fps 5.0] [--max-frames 4000] [--force]
 python scripts/render_clip.py  --video-id <id> [--clip <clip_id>] [--all-approved]
 python scripts/upload_clip.py --video-id <id> --clip <clip_id> [--platform youtube] [--account <account_id>]
 python scripts/auth.py        --platform youtube [--account <account_id>]
@@ -78,12 +84,12 @@ Render é **sequencial** por clip (GPU 6GB não comporta paralelismo folgado).
 | Agente | Quando spawnar | Faz |
 |---|---|---|
 | `clip-scout` | após `transcribe` done | lê `transcript.compact.json` + `references/heuristicas-virais.md`; escreve clips `planned` em `clips.json` (start/end, hook, score, rationale, `thumbnail_ts`) |
-| `copywriter` | após `plan` done | preenche `title`, `title_alts`, `description`, `tags`, `thumbnail_text` dos clips `planned` |
+| `copywriter` | após `plan` done | preenche `title`, `title_alts`, `description`, `tags`, `thumbnail_text` dos clips `planned` (lê `padrao-copy.md` universal **+** `references/copy/<copy_profile>.md` do nicho da conta) |
 | `thumbnail-director` | após `copy`, **se** conta opt-in + `faces.json` ok (opcional) | lê `faces.json` + `thumbnail_text`; escreve `thumbnail_plan` (frame_ts, rosto/host, layout) nos clips `planned` — usado pela thumb compositada |
 | `qa-reviewer` | após `render` | ffprobe em cada mp4 (resolução, duração ±0.5s, áudio); aprova → carimba `qa.status: "pass"` (mantém `rendered`, libera auto-publish) ou marca `failed`/`rejected` + `qa.status: "fail"` |
 | `publisher` | só após aprovação explícita do usuário | roda `upload_clip.py` por clip, valida retorno, registra `publish.*`; em `quotaExceeded` para tudo e reporta |
 
-Passe sempre no prompt do subagente: `video_id`, caminho da pasta do vídeo (`video-output/<video_id>`) e o que se espera de volta (resumo curto, não o JSON inteiro).
+Passe sempre no prompt do subagente: `video_id`, **`account_id` (obrigatório — sem default; o mesmo de todo o pipeline daquele vídeo)**, caminho da pasta do vídeo (`video-output/<video_id>`) e o que se espera de volta (resumo curto, não o JSON inteiro).
 
 ## 7. Skills
 
@@ -96,11 +102,21 @@ Passe sempre no prompt do subagente: `video_id`, caminho da pasta do vídeo (`vi
 
 ## 8. Multi-conta e multi-plataforma
 
+**Canais atuais** (fonte: `config/accounts.json`; mantenha esta lista sincronizada ao rodar `/adicionar-canal`):
+
+| id | canal | nicho | `copy_profile` | default |
+|---|---|---|---|---|
+| `principal` | Missão no Nordeste | política (partido Missão/MBL, direita liberal, eleições 2026) | `politica` | sim |
+| `negocios` | Economia de Bits | finanças/economia/negócios (investimentos, educação financeira, empreendedorismo) | `financas` | não |
+
+- **Conta é sempre explícita.** `/produzir` e `/planejar` exigem `--conta <id>`; se faltar, **PARE e pergunte** — nunca caia no default silencioso. Com 2+ canais, assumir a conta errada mistura os canais (brand do render, nicho da copy e canal do upload errados) e é difícil de desfazer. A flag `"default"` de `accounts.json` só resolve chamadas diretas de script de manutenção, **não** a produção de um vídeo.
 - Contas em `config/accounts.json`; credenciais isoladas em `secrets/<plataforma>/<conta>/`.
-  Resolução via `core.accounts.get_account(platform, account_id)` (default por flag `"default"`).
-- Cada conta define a identidade editorial: `channel_name`, `niche` e `default_hashtags`.
-  O copywriter usa o nicho para coerência e completa as hashtags específicas (extraídas da
-  transcrição) com as `default_hashtags` da conta. Passe o `account_id` no prompt dele.
+  Resolução via `core.accounts.get_account(platform, account_id)`.
+- Cada conta define a identidade editorial: `channel_name`, `niche`, `copy_profile` e `default_hashtags`.
+  O copywriter lê o padrão **universal** (`references/padrao-copy.md`) **+ o perfil do nicho**
+  (`references/copy/<copy_profile>.md` — ex.: `politica`/`financas`; arquétipos, exemplos com nomes
+  reais, hashtags e avisos legais do nicho) e completa as hashtags específicas (da transcrição) com
+  as `default_hashtags` da conta. Passe o `account_id` no prompt dele.
 - Fontes: `core/sources/` — `VideoSource.matches(url)/fetch()` + registry `get_source(url)`.
 - Destinos: `core/publishers/` — `Publisher.authenticate()/upload()` + registry `get_publisher(platform)`.
 - **Nova plataforma = nova classe + registro no `__init__.py`. O schema de `clips.json` NÃO muda** (`publish.platform` já parametrizado).

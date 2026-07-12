@@ -9,20 +9,21 @@ Roda apenas as fases `plan` + `copy` do pipeline, com checkpoint humano ao final
 
 ## Pre-condicoes
 
-1. Leia `video-output/<video_id>/state.json`. Se nao existe, ou se `stages.transcribe.status != "done"`, **pare** e informe: e preciso rodar `/produzir <url>` (ou ao menos download + transcribe) antes de planejar.
-2. Se `stages.plan.status == "done"` e ja existe `clips.json` com clips: avise o usuario que o planejamento ja foi feito e pergunte se deseja apenas rever/aprovar os clips existentes (pule para o checkpoint) ou re-planejar do zero (so re-spawne o clip-scout com confirmacao explicita — re-planejar descarta a analise anterior).
+1. **Resolva a conta: `--conta <id>` e OBRIGATORIA.** Se o usuario nao passar, **pare e pergunte qual canal** — nunca assuma o default (com 2+ canais, a conta errada mistura os canais). Canais atuais em `config/accounts.json` (lista no `CLAUDE.md` §8); o id tem que existir la.
+2. Leia `video-output/<video_id>/state.json`. Se nao existe, ou se `stages.transcribe.status != "done"`, **pare** e informe: e preciso rodar `/produzir <url>` (ou ao menos download + transcribe) antes de planejar.
+3. Se `stages.plan.status == "done"` e ja existe `clips.json` com clips: avise o usuario que o planejamento ja foi feito e pergunte se deseja apenas rever/aprovar os clips existentes (pule para o checkpoint) ou re-planejar do zero (so re-spawne o clip-scout com confirmacao explicita — re-planejar descarta a analise anterior).
 
 ## 1. clip-scout
 
-Spawne o subagente `clip-scout` via Task, informando: workspace (`video-output/<video_id>/`) e a conta de publicacao (`--conta`, ou a conta `"default": true` de `config/accounts.json`). Ele escreve os candidatos em `clips.json` com `status: "planned"`.
+Spawne o subagente `clip-scout` via Task, informando: workspace (`video-output/<video_id>/`) e a conta de publicacao (a do `--conta`, **obrigatoria — sem default**). Ele escreve os candidatos em `clips.json` com `status: "planned"` (e grava a conta em `publish.account`).
 
-Apos o retorno, valide: `clips.json` existe e os clips respeitam os limites de formato (`short` 30-165s de conteudo, `corte` 480-900s / 8-15 min). Confirme que a etapa `plan` ficou `done` em `state.json`; se o subagente nao marcou, atualize voce mesmo com `python -c` usando `core.state` (load, `set_stage(state, "plan", "done")`, save).
+Apos o retorno, valide: `clips.json` existe e os clips respeitam os limites de formato (`short` 30-165s de conteudo, `corte` 480-600s / 8-10 min). Confirme que a etapa `plan` ficou `done` em `state.json`; se o subagente nao marcou, atualize voce mesmo com `python -c` usando `core.state` (load, `set_stage(state, "plan", "done")`, save).
 
 **Regra inviolavel**: 0 clips com score >= 60 e um resultado valido. Nao invente cortes nem rebaixe criterios — encerre graciosamente com um resumo do porque o video nao rendeu.
 
 ## 2. copywriter
 
-Spawne o subagente `copywriter` via Task com o mesmo workspace e o `account_id` da conta alvo (`--conta` ou a default de `config/accounts.json`). Ele preenche `title`, `title_alts`, `description`, `tags` dos clips `planned` seguindo `references/padrao-copy.md` e a identidade do canal (`channel_name`, `niche`, `default_hashtags` da conta). Confirme a etapa `copy` como `done` em `state.json` (mesmo procedimento acima).
+Spawne o subagente `copywriter` via Task com o mesmo workspace e o `account_id` da conta alvo (o do `--conta`; **sem default**). Ele preenche `title`, `title_alts`, `description`, `tags` dos clips `planned` seguindo `references/padrao-copy.md` (universal) **+ `references/copy/<copy_profile>.md`** (nicho da conta) e a identidade do canal (`channel_name`, `niche`, `default_hashtags`). Confirme a etapa `copy` como `done` em `state.json` (mesmo procedimento acima).
 
 Antes do checkpoint, valide a copy: rode `python scripts/validate_plan.py --video-id <video_id>` e leia a ultima linha JSON (`{ok, errors, warnings, clips_com_copy}`). Se houver `errors`, re-spawne o copywriter **1 vez** com os erros no prompt e rode a validacao de novo; se ainda falhar, pare e reporte ao usuario com os erros exatos. `warnings` nao bloqueiam — guarde-os para exibir sob a tabela do checkpoint.
 
