@@ -7,6 +7,7 @@ rebased.
 """
 import os
 import subprocess
+import time
 from pathlib import Path
 
 from .. import paths
@@ -16,6 +17,12 @@ from .branding import build_border_ass, build_corte_filter, resolve_brand
 from .captions import build_ass
 from .corte_frame import BG_FALLBACK as CORTE_BG_FALLBACK
 from .corte_frame import build_corte_frame_filter
+from .encoder import (
+    is_nvenc_error,
+    note_nvenc_failure,
+    resolve_encoder,
+    video_codec_args,
+)
 from .intro import prepend_intro
 from . import jumpcut
 from .jumpcut_config import jumpcut_enabled, resolve_jumpcut
@@ -66,7 +73,8 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
                     dur_read: float | None = None,
                     crop_segments: list[dict] | None = None,
                     accent_hex: str = "#FFD93D",
-                    sfx_path: str | None = None) -> list[str]:
+                    sfx_path: str | None = None,
+                    encoder: str = "libx264") -> list[str]:
     """Comando ffmpeg para short 1080x1920 com moldura fixa + legendas queimadas.
 
     Fundo ESTATICO (nao mais blur): arte PNG decorativa da conta (`frame_png`,
@@ -107,8 +115,7 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
         "-filter_complex", filter_complex,
         "-map", "[v]", "-map", ("[aout]" if audio_graph else "0:a?"),
         "-r", "30",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-        "-pix_fmt", "yuv420p",
+        *video_codec_args("short", encoder),
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         "-t", _t(dur),
@@ -123,7 +130,8 @@ def build_corte_cmd(start: float, dur: float, out_filename: str,
                     frame_png: str | None = None,
                     audio_graph: str = "", music_path: str | None = None,
                     dur_read: float | None = None,
-                    sfx_path: str | None = None) -> list[str]:
+                    sfx_path: str | None = None,
+                    encoder: str = "libx264") -> list[str]:
     """Comando ffmpeg para corte 1920x1080.
 
     Com `filter_complex` (moldura de marca) aplica a cadeia -> [v] e mapeia
@@ -165,8 +173,7 @@ def build_corte_cmd(start: float, dur: float, out_filename: str,
                 "-map", ("[aout]" if audio_graph else "0:a?"),
                 "-r", "30"]
     cmd += [
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
-        "-pix_fmt", "yuv420p",
+        *video_codec_args("corte", encoder),
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         "-t", _t(dur),
@@ -313,6 +320,10 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
                 in_label=final_label, out_label="aout")
         return graph, music_path, (sfx_path if use_sfx else None)
 
+    # Cada ramo prepara os efeitos colaterais uma vez (.ass, filter_complex,
+    # audio_graph) e devolve `build_cmd(enc)`: uma closure que so monta a lista
+    # do ffmpeg com o encoder escolhido. Isso permite RE-MONTAR o comando com
+    # outro encoder no fallback NVENC->CPU sem reprocessar nada acima.
     if rules["burn_captions"]:
         if not transcript:
             raise ValueError(f"{clip['id']}: formato {fmt} exige transcript para legendas")
@@ -320,13 +331,14 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
         ass_path.write_text(build_ass(clip, transcript, speed=speed, time_map=jc_tm), encoding="utf-8")
         frame_png = _resolve_frame_png(brand.get("short_frame"))
         audio_graph, music, sfx_use = _audio_for(bool(frame_png))
-        cmd = build_short_cmd(
-            start, dur, ass_path.name, out_name, source=source_rel,
-            frame_png=frame_png, bg_hex=brand.get("short_bg_color", BG_FALLBACK),
-            vfx=vfx, audio_graph=audio_graph, music_path=music, dur_read=dur_read,
-            accent_hex=brand.get("accent_color", "#FFD93D"),
-            crop_segments=crop_segments, sfx_path=sfx_use,
-        )
+        def build_cmd(enc: str) -> list[str]:
+            return build_short_cmd(
+                start, dur, ass_path.name, out_name, source=source_rel,
+                frame_png=frame_png, bg_hex=brand.get("short_bg_color", BG_FALLBACK),
+                vfx=vfx, audio_graph=audio_graph, music_path=music, dur_read=dur_read,
+                accent_hex=brand.get("accent_color", "#FFD93D"),
+                crop_segments=crop_segments, sfx_path=sfx_use, encoder=enc,
+            )
     elif rules.get("border"):
         corte_png = _resolve_frame_png(brand.get("corte_frame"))
         if corte_png:
@@ -334,34 +346,56 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
             fc = build_corte_frame_filter(CORTE_BG_FALLBACK, has_png=True, vfx=vfx,
                                           crop_segments=crop_segments)
             audio_graph, music, sfx_use = _audio_for(True)
-            cmd = build_corte_cmd(start, dur, out_name, source=source_rel,
-                                  filter_complex=fc, frame_png=corte_png,
-                                  audio_graph=audio_graph, music_path=music,
-                                  dur_read=dur_read, sfx_path=sfx_use)
+            def build_cmd(enc: str) -> list[str]:
+                return build_corte_cmd(start, dur, out_name, source=source_rel,
+                                       filter_complex=fc, frame_png=corte_png,
+                                       audio_graph=audio_graph, music_path=music,
+                                       dur_read=dur_read, sfx_path=sfx_use, encoder=enc)
         else:
             # Fallback: moldura gerada (padding + rim + faixa de texto ASS).
             border_ass = paths.clip_border_ass_path(video_id, clip["id"])
             border_ass.write_text(build_border_ass(brand), encoding="utf-8")
             fc = build_corte_filter(brand, border_ass.name, vfx=vfx)
             audio_graph, music, sfx_use = _audio_for(False)
-            cmd = build_corte_cmd(start, dur, out_name, source=source_rel,
-                                  filter_complex=fc, audio_graph=audio_graph,
-                                  music_path=music, dur_read=dur_read, sfx_path=sfx_use)
+            def build_cmd(enc: str) -> list[str]:
+                return build_corte_cmd(start, dur, out_name, source=source_rel,
+                                       filter_complex=fc, audio_graph=audio_graph,
+                                       music_path=music, dur_read=dur_read,
+                                       sfx_path=sfx_use, encoder=enc)
     else:
         audio_graph, music, sfx_use = _audio_for(False)
-        cmd = build_corte_cmd(start, dur, out_name, source=source_rel,
-                              audio_graph=audio_graph, music_path=music,
-                              dur_read=dur_read, sfx_path=sfx_use)
+        def build_cmd(enc: str) -> list[str]:
+            return build_corte_cmd(start, dur, out_name, source=source_rel,
+                                   audio_graph=audio_graph, music_path=music,
+                                   dur_read=dur_read, sfx_path=sfx_use, encoder=enc)
 
+    # Encoder da MAQUINA (auto/nvenc/libx264). Fallback de runtime: se o NVENC
+    # falhar com erro ESPECIFICO de encoder, re-monta com libx264 e re-roda uma
+    # vez; `note_nvenc_failure()` degrada o resto do processo para CPU.
+    encoder = resolve_encoder()
+    _t0 = time.perf_counter()
     proc = subprocess.run(
-        cmd, cwd=str(clip_dir), capture_output=True,
+        build_cmd(encoder), cwd=str(clip_dir), capture_output=True,
         text=True, encoding="utf-8", errors="replace",
     )
+    encoder_fallback = False
+    if proc.returncode != 0 and encoder == "nvenc" and is_nvenc_error(proc.stderr):
+        note_nvenc_failure()
+        encoder = "libx264"
+        encoder_fallback = True
+        proc = subprocess.run(
+            build_cmd(encoder), cwd=str(clip_dir), capture_output=True,
+            text=True, encoding="utf-8", errors="replace",
+        )
     if proc.returncode != 0:
         tail = "\n".join((proc.stderr or "").strip().splitlines()[-20:])
         raise RuntimeError(f"ffmpeg falhou (exit {proc.returncode}): {tail}")
 
     info = video_info(out_path)
+    info["encode_seconds"] = round(time.perf_counter() - _t0, 2)
+    info["encoder"] = encoder
+    if encoder_fallback:
+        info["encoder_fallback"] = True
     problems: list[str] = []
     resolution = f"{info['width']}x{info['height']}"
     if resolution != rules["resolution"]:
@@ -406,8 +440,11 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
     # so e gravado quando de fato aplicado (senao o QA desincroniza a duracao).
     if thumb_img is not None and intro_enabled(tcfg, fmt):
         try:
+            _ti = time.perf_counter()
             added = prepend_intro(out_path, thumb_img, rules["resolution"],
-                                  duration_s=float(tcfg["intro_duration_s"]))
+                                  duration_s=float(tcfg["intro_duration_s"]),
+                                  encoder=encoder, fmt=fmt)
+            info["intro_seconds"] = round(time.perf_counter() - _ti, 2)
             info["intro_duration_s"] = added
             info["duration_s"] = video_info(out_path)["duration_s"]
         except Exception as exc:  # noqa: BLE001 — intro nao e fatal
@@ -420,8 +457,10 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
     # contrario da miniatura/intro). `_resolve_frame_png` resolve o path.
     outro_path = _resolve_frame_png(brand.get(f"{fmt}_outro"))
     if outro_path:
-        crf = 18 if fmt == "short" else 20
-        added = append_outro(out_path, outro_path, rules["resolution"], crf=crf)
+        _to = time.perf_counter()
+        added = append_outro(out_path, outro_path, rules["resolution"],
+                             encoder=encoder, fmt=fmt)
+        info["outro_seconds"] = round(time.perf_counter() - _to, 2)
         info["outro_duration_s"] = added
         info["duration_s"] = video_info(out_path)["duration_s"]
 

@@ -155,6 +155,15 @@ def main() -> None:
         render_block["output_path"] = _output_rel(video_id, cid)
         render_block["rendered_at"] = _now()
         render_block["actual_duration_s"] = round(info["duration_s"], 3)
+        # Encoder efetivo + tempos de encode (medicao de performance; NVENC vs
+        # libx264, mais fallback quando o NVENC nao roda nesta maquina).
+        if info.get("encoder"):
+            render_block["encoder"] = info["encoder"]
+        if info.get("encoder_fallback"):
+            render_block["encoder_fallback"] = True
+        for key in ("encode_seconds", "intro_seconds", "outro_seconds"):
+            if info.get(key) is not None:
+                render_block[key] = info[key]
         if info.get("intro_duration_s") is not None:
             render_block["intro_duration_s"] = info["intro_duration_s"]
         if info.get("outro_duration_s") is not None:
@@ -175,6 +184,12 @@ def main() -> None:
         contracts.save_plan(clips_file, plan)
         result = {"clip_id": cid, "status": "rendered",
                   "output": render_block["output_path"]}
+        if info.get("encoder"):
+            result["encoder"] = info["encoder"]
+        if info.get("encode_seconds") is not None:
+            result["encode_seconds"] = info["encode_seconds"]
+        if info.get("encoder_fallback"):
+            result["encoder_fallback"] = True
         # Erros best-effort (miniatura/composite/intro): reportados, nunca reprovam.
         for key in ("thumbnail_error", "thumbnail_composite_error", "intro_error"):
             if info.get(key):

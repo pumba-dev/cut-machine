@@ -21,6 +21,7 @@ import subprocess
 from pathlib import Path
 
 from ..media import video_info
+from .encoder import is_nvenc_error, note_nvenc_failure, video_codec_args
 
 
 def _t(v: float) -> str:
@@ -34,13 +35,16 @@ def _norm_video(w: int, h: int) -> str:
 
 
 def append_outro(main_mp4: Path, outro_path: str, resolution: str,
-                 crf: int = 18) -> float:
+                 encoder: str = "libx264", fmt: str = "short") -> float:
     """Concatena `outro_path` ao final de `main_mp4` (in-place, atomico).
 
     `resolution` = "LARGxALT" do formato (o main ja vem nessa resolucao; o outro
-    e normalizado para ela). `crf` casa com o do render do formato (short 18,
-    corte 20). Retorna a duracao (s) efetivamente acrescentada ao arquivo
-    (= duracao do outro no resultado). Levanta RuntimeError se o ffmpeg falhar.
+    e normalizado para ela). `encoder`/`fmt` definem o codec de video (NVENC ou
+    libx264; a qualidade por formato — short cq/crf vs corte — vem de
+    `encoder.video_codec_args`). Retorna a duracao (s) efetivamente acrescentada
+    ao arquivo (= duracao do outro no resultado). Levanta RuntimeError se o
+    ffmpeg falhar. Se o NVENC falhar com erro de encoder, re-tenta uma vez em
+    libx264 (e degrada o resto do processo para CPU).
     """
     main_mp4 = Path(main_mp4)
     w, h = (int(x) for x in resolution.split("x"))
@@ -64,22 +68,29 @@ def append_outro(main_mp4: Path, outro_path: str, resolution: str,
     filter_complex = ";".join(parts)
 
     tmp = main_mp4.with_suffix(".outro.tmp.mp4")
-    cmd = [
-        "ffmpeg",
-        "-i", str(main_mp4),
-        "-i", str(outro_path),
-        "-filter_complex", filter_complex,
-        "-map", "[v]", "-map", "[a]",
-        "-r", "30",
-        "-c:v", "libx264", "-preset", "medium", "-crf", str(crf),
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        "-movflags", "+faststart",
-        "-y", str(tmp),
-    ]
+
+    def _cmd(enc: str) -> list[str]:
+        return [
+            "ffmpeg",
+            "-i", str(main_mp4),
+            "-i", str(outro_path),
+            "-filter_complex", filter_complex,
+            "-map", "[v]", "-map", "[a]",
+            "-r", "30",
+            *video_codec_args(fmt, enc),
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
+            "-y", str(tmp),
+        ]
+
     proc = subprocess.run(
-        cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        _cmd(encoder), capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
+    if proc.returncode != 0 and encoder == "nvenc" and is_nvenc_error(proc.stderr):
+        note_nvenc_failure()
+        proc = subprocess.run(
+            _cmd("libx264"), capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
     if proc.returncode != 0:
         tmp.unlink(missing_ok=True)
         tail = "\n".join((proc.stderr or "").strip().splitlines()[-20:])
