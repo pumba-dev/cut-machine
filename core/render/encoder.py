@@ -49,22 +49,24 @@ _NVENC_ERR = re.compile(
 _force_libx264 = False
 
 
-def video_codec_args(fmt: str, encoder: str) -> list[str]:
-    """Span `-c:v ... -pix_fmt yuv420p` para o formato/encoder.
+def video_codec_args(fmt: str, encoder: str, pix_fmt: str = "yuv420p") -> list[str]:
+    """Span `-c:v ... -pix_fmt <pix_fmt>` para o formato/encoder.
 
     Retorna SO o codec de video; `-r 30`, `-c:a`, `-movflags`, `-t`, `-y out`
-    ficam a cargo do chamador. Com `encoder="libx264"` produz exatamente o span
-    de hoje (sem regressao no caminho CPU)."""
+    ficam a cargo do chamador. Com `encoder="libx264"` e `pix_fmt="yuv420p"`
+    produz exatamente o span de hoje (sem regressao no caminho CPU). `pix_fmt`
+    e overridavel para o concat-copy do intro/outro casar o range do conteudo
+    (short=`yuvj420p`/full vs corte=`yuv420p`/limited)."""
     crf, cq = _QUALITY[fmt]
     if encoder == "nvenc":
         maxrate, bufsize = _MAXRATE[fmt]
         return [
             "-c:v", "h264_nvenc", *_NVENC_BASE,
             "-cq", str(cq), "-maxrate", maxrate, "-bufsize", bufsize,
-            "-pix_fmt", "yuv420p",
+            "-pix_fmt", pix_fmt,
         ]
     return ["-c:v", "libx264", "-preset", "medium", "-crf", str(crf),
-            "-pix_fmt", "yuv420p"]
+            "-pix_fmt", pix_fmt]
 
 
 @functools.lru_cache(maxsize=1)

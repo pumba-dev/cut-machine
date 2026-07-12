@@ -116,7 +116,10 @@ def build_short_cmd(start: float, dur: float, captions_ass: str,
         "-map", "[v]", "-map", ("[aout]" if audio_graph else "0:a?"),
         "-r", "30",
         *video_codec_args("short", encoder),
-        "-c:a", "aac", "-b:a", "192k",
+        # -ar/-ac fixos: audio uniforme (48k estereo) e pre-requisito do
+        # concat-copy do intro/outro (o demuxer recusa segmentos com params de
+        # audio divergentes). Invisivel ao QA (so checa has_audio).
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
         "-movflags", "+faststart",
         "-t", _t(dur),
         "-y", out_filename,
@@ -174,7 +177,10 @@ def build_corte_cmd(start: float, dur: float, out_filename: str,
                 "-r", "30"]
     cmd += [
         *video_codec_args("corte", encoder),
-        "-c:a", "aac", "-b:a", "192k",
+        # -ar/-ac fixos: audio uniforme (48k estereo) e pre-requisito do
+        # concat-copy do outro (o demuxer recusa segmentos com params de audio
+        # divergentes). Invisivel ao QA (so checa has_audio).
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
         "-movflags", "+faststart",
         "-t", _t(dur),
         "-y", out_filename,

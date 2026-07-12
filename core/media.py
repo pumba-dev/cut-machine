@@ -27,4 +27,12 @@ def video_info(path: Path) -> dict:
         "fps": round(fps, 3),
         "duration_s": float(data["format"]["duration"]),
         "has_audio": audio is not None,
+        # Params de stream (concat-copy do intro/outro casa a arte ao conteudo).
+        # Chaves aditivas: callers existentes leem so as de cima.
+        "vcodec": video.get("codec_name"),
+        "pix_fmt": video.get("pix_fmt"),
+        "sar": video.get("sample_aspect_ratio") or "1:1",
+        "vtime_base": video.get("time_base"),
+        "a_sample_rate": int(audio["sample_rate"]) if audio and audio.get("sample_rate") else None,
+        "a_channels": int(audio["channels"]) if audio and audio.get("channels") else None,
     }
