@@ -31,7 +31,7 @@ Não bloqueia os passos técnicos abaixo — pode rodar em paralelo.
 ## Passo 1 — Escolher `account id` e checar órfãos
 
 Escolha um slug curto pro `id` interno (ex. `negocios`, `cortes2` — como
-`principal` já é o id do 1º canal, não precisa ser descritivo; o nome de verdade
+`politica` já é o id do 1º canal, não precisa ser descritivo; o nome de verdade
 vai em `label`/`channel_name`). **Antes de criar do zero**, cheque se já existe
 algo em disco com esse id (retomada de tentativa anterior):
 
@@ -46,7 +46,7 @@ Se `credentials.json` já existir (sem `token.json`, sem entrada em
 o usuário se reaproveita (pula a criação do projeto GCP no Passo 2) ou descarta.
 
 Se os PNGs de moldura já existirem, **compare o SHA256 com os de outra conta**
-(`sha256sum assets/short-frame/<id>.png assets/short-frame/principal.png`, etc.) —
+(`sha256sum assets/short-frame/<id>.png assets/short-frame/politica.png`, etc.) —
 se forem idênticos, é uma cópia-placeholder que ainda carrega a marca/cor de outro
 canal, não arte final. Ver Passo 4 (recolorir em vez de descartar).
 
@@ -148,7 +148,7 @@ Comece só com os campos mínimos (`platform`/`id`/`label`/`channel_name`/`niche
 `copy_profile`/`credentials_dir`/`default`/`daily_upload_limit`/`default_hashtags`) se o
 usuário quiser ir ao ar rápido sem moldura customizada — `brand`/`transform`/`reframe`/
 `thumbnail`/`jumpcut` ausentes = fallback liso (cor chapada / tudo-off), zero erro.
-`transform`/`reframe` acima são os valores já validados em `principal` (mesmo
+`transform`/`reframe` acima são os valores já validados em `politica` (mesmo
 risco de Content ID de repostar conteúdo de terceiros) — copie como ponto de
 partida, não precisa reinventar por canal.
 
@@ -221,7 +221,7 @@ Confira visualmente o resultado (Read da imagem) antes de aceitar.
 **Caveat de geometria**: a janela recortada da moldura (`WINDOW` em
 `core/render/short_frame.py`/`corte_frame.py`) é uma constante **global** hoje,
 não por conta — assume que toda arte tem o mesmo recorte da 1ª conta
-(`principal`). Recolorir uma arte existente preserva a geometria automaticamente
+(`politica`). Recolorir uma arte existente preserva a geometria automaticamente
 (mesmo arquivo, só muda a cor). Se for desenhar arte nova do zero, mantenha a
 janela transparente nas MESMAS coordenadas (documentado no topo dos dois
 arquivos) — janela diferente exigiria refatorar `WINDOW` pra vir do bloco `brand`

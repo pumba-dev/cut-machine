@@ -3,19 +3,53 @@
   "accounts": [
     {
       "platform": "youtube",
-      "id": "principal",
-      "label": "Missão no Nordeste",
-      "channel_name": "Missão no Nordeste",
-      "niche": "Cortes de política do partido Missão (fundado pelo MBL): o presidenciável Renan Santos e os porta-vozes do partido (Kim Kataguiri, Guto Zacarias, Amanda Vettorazzo). Direita liberal / terceira via, eleições 2026, conteúdo pt-BR.",
+      "id": "politica",
+      "label": "Política em Bits",
+      "channel_name": "Política em Bits",
+      "handle": "@politicaembit",
+      "url": "https://www.youtube.com/@politicaembit",
+      "description": "Bem-vindo ao Política em Bits! ⚡ O seu radar diário para os momentos mais cruciais da política brasileira, debates e bastidores do poder.\n\nEm vez de perder horas a assistir a sessões intermináveis no Congresso Nacional ou a podcasts longos, nós descodificamos Brasília para si. Trazemos os melhores cortes, refutações épicas, embates ideológicos e tudo o que precisa de saber sobre a rota para as Eleições de 2026.\n\nFocamo-nos na lógica, nos factos e na visão de uma direita liberal moderna e de terceira via, desmascarando o populismo de forma rápida e direta — em pequenos \"bits\" de informação de alto impacto.\n\nSe procura informação sem filtros, inteligência e as melhores discussões políticas do Brasil:\n🔔 Inscreva-se agora, ative o sino e faça parte do debate!\n\n🌐 Fazemos parte da Rede Bits. Conheça também o nosso canal irmão: Economia de Bits.",
+      "niche": "Cortes de política brasileira em geral (Congresso Nacional, debates, entrevistas e bastidores do poder): melhores momentos, refutações épicas e embates ideológicos. Visão de direita liberal moderna / terceira via, foco nas eleições 2026, desmascarando o populismo — em pequenos \"bits\" de alto impacto, pt-BR. Faz parte da Rede Bits (irmão de Economia de Bits).",
+      "keywords": [
+        "política brasileira",
+        "cortes de política",
+        "congresso nacional",
+        "eleições 2026",
+        "direita liberal",
+        "terceira via",
+        "debates políticos",
+        "bastidores do poder",
+        "brasília",
+        "política em bits",
+        "refutações",
+        "embates ideológicos"
+      ],
       "copy_profile": "politica",
-      "credentials_dir": "secrets/youtube/principal",
+      "credentials_dir": "secrets/youtube/politica",
       "default": true,
       "daily_upload_limit": 100,
       "brand": {
-        "short_frame": "assets/short-frame/principal.png",
-        "corte_frame": "assets/corte-frame/principal.png",
-        "short_outro": "assets/short-end/principal.mp4",
-        "corte_outro": "assets/corte-end/principal.mp4"
+        "short_frame": "assets/short-frame/politica.png",
+        "corte_frame": "assets/corte-frame/politica.png",
+        "short_outro": "assets/short-end/politica.mp4",
+        "corte_outro": "assets/corte-end/politica.mp4",
+        "accent_color": "#FFFFFF"
+      },
+      "design": {
+        "aesthetic": "8-bit pixel art, estritamente monocromático / escala de cinza — visual sereno e profissional (transição do antigo visual 'combate' colorido do Missão). Nome centralizado em fonte de bloco 8-bit com efeito neon branco/prata brilhante.",
+        "palette": {
+          "background": "#1A1A1A",
+          "charcoal": "#222222",
+          "silver": "#C0C0C0",
+          "white": "#FFFFFF",
+          "mode": "grayscale-monochrome"
+        },
+        "prompts": {
+          "logo": "A minimalist 8-bit pixel art icon of a classic broadcasting microphone floating in the center. The microphone has a distinct pixelated texture in shades of silver, white, and gray, with a subtle white glowing effect. Solid dark charcoal gray background, light gray sparks radiating from it. Grayscale, monochrome palette, clean, symmetrical, high contrast, NO TEXT, video game UI asset style.",
+          "banner": "A high-definition, cinematic YouTube banner (2560 x 1440 pixels) for a digital politics channel named 'POLÍTICA EM BITS'. The entire aesthetic is strictly grayscale and monochrome, utilizing only dark charcoal gray, silver, and white. The background is a dark, textured digital abyss. On the far left and far right edges, complex, intricate abstract 8-bit pixelated data waves and digital network lines flow inward towards the center. Positioned in the precise horizontal and vertical center of the banner, acting as the main focal point, is the text 'POLÍTICA EM BITS'. This text is rendered in a large, bold, stylized 8-bit block font, with a glowing white and silver neon effect. 'POLÍTICA' sits above 'EM BITS', perfectly aligned and centered, fully contained within the central 'safe zone' (middle 1546 x 423 pixels). In the bottom right corner of the central safe zone, there is a small, distinct 8-bit pixel art icon of a 'Subscribe Bell' with the pixelated text 'INSCREVA-SE' next to it, also glowing faintly. No other logos or watermarks are present. High contrast, cinematic lighting. Aspect ratio 16:9.",
+          "outro_short": "A 10-second, 9:16 vertical (1080x1920) end-screen animation for the YouTube channel 'POLÍTICA EM BITS'. Strictly grayscale and monochrome — dark charcoal gray, silver, white only. Dark textured digital abyss background with faint 8-bit pixelated data waves and network lines pulsing softly. In the upper-center, an 8-bit pixel art broadcasting microphone icon in silver/white with a subtle glow floats and gently bobs. Below it, the text 'POLÍTICA EM BITS' animates in with a glowing white-and-silver neon 8-bit block font, 'POLÍTICA' above 'EM BITS', perfectly centered. In the lower-center, a large 8-bit pixel-art 'Subscribe Bell' icon rings/shakes with light-gray sparks radiating, next to pulsing pixelated text 'INSCREVA-SE'. At the very bottom, small pixelated text 'Rede Bits'. Timed on-screen call-to-action buttons, in 8-bit pixel art with a white-and-silver neon glow, animate in sync with the voiceover: during the FIRST half, as she says 'Deixa seu like, comenta sua opinião', a LIKE (thumbs-up), a COMMENT (speech bubble) and a SHARE (arrow) button pop in one after another, lower-center, each with a small bounce and glow; then in the SECOND half, as she says 'se inscreve', those three fade out and a large SUBSCRIBE button (the bell + 'INSCREVA-SE') slides in front-and-center and pulses/highlights. Smooth loopable retro-arcade motion, high contrast, cinematic lighting, no photorealistic elements, no watermarks. Generate with audio: a soft, low 8-bit chiptune music bed under a warm, friendly female voiceover in natural Brazilian Portuguese — pleasant, calm and welcoming, with broad appeal for all audiences, perfectly clear and mixed loud above the music, well-articulated and unhurried so the whole line fits comfortably in the 10 seconds — the voice says: 'Esse foi mais um corte do Política em Bits! Curtiu? Deixa seu like, comenta sua opinião e se inscreve pra não perder nenhum dos próximos. Até já!'",
+          "outro_corte": "A 10-second, 16:9 horizontal (1920x1080) end-screen animation for the YouTube channel 'POLÍTICA EM BITS'. Strictly grayscale and monochrome — dark charcoal gray, silver, white only. Dark textured digital abyss background; on the far left and right edges, abstract 8-bit pixelated data waves and digital network lines flow inward and pulse. Center-left: an 8-bit pixel art broadcasting microphone icon in silver/white with a subtle glow, gently bobbing. Center: the text 'POLÍTICA EM BITS' animates in with a glowing white-and-silver neon 8-bit block font, 'POLÍTICA' above 'EM BITS', centered in the safe zone. Right side: a large 8-bit pixel-art 'Subscribe Bell' icon ringing with light-gray sparks, next to pulsing pixelated text 'INSCREVA-SE'. Bottom-right corner: small pixelated text 'Rede Bits'. Timed on-screen call-to-action buttons, in 8-bit pixel art with a white-and-silver neon glow, animate in sync with the voiceover: during the FIRST half, as she says 'Deixa seu like, comenta sua opinião', a LIKE (thumbs-up), a COMMENT (speech bubble) and a SHARE (arrow) button pop in one after another, lower-center, each with a small bounce and glow; then in the SECOND half, as she says 'se inscreve', those three fade out and a large SUBSCRIBE button (the bell + 'INSCREVA-SE') slides in front-and-center and pulses/highlights. Smooth retro-arcade motion, high contrast, cinematic lighting, no photorealistic elements, no watermarks. Generate with audio: a soft, low 8-bit chiptune music bed under a warm, friendly female voiceover in natural Brazilian Portuguese — pleasant, calm and welcoming, with broad appeal for all audiences, perfectly clear and mixed loud above the music, well-articulated and unhurried so the whole line fits comfortably in the 10 seconds — the voice says: 'Esse foi mais um corte do Política em Bits! Curtiu? Deixa seu like, comenta sua opinião e se inscreve pra não perder nenhum dos próximos. Até já!'"
+        }
       },
       "transform": {
         "speed": 1.05,
@@ -59,8 +93,10 @@
         "#política",
         "#eleicoes2026",
         "#direita",
-        "#renansantos",
-        "#partidomissao"
+        "#congresso",
+        "#brasil",
+        "#politicabrasileira",
+        "#terceiravia"
       ]
     },
     {
@@ -68,7 +104,25 @@
       "id": "negocios",
       "label": "Economia de Bits",
       "channel_name": "Economia de Bits",
-      "niche": "Cortes de podcasts, palestras e entrevistas sobre economia, mercado financeiro e negócios: investimentos, educação financeira e empreendedorismo, em linguagem direta e sem enrolação (pt-BR). Estética 8-bit pixel art, navy + verde neon.",
+      "handle": "@economiadebits",
+      "url": "https://www.youtube.com/@economiadebits",
+      "_handle_url_note": "CONFIRMAR: handle/url chutados por espelho de 'politica' (@politicaembit); não confirmados por fonte. Corrigir com o handle real do canal.",
+      "description": "Bem-vindo ao Economia de Bits! ⚡ O seu radar diário para descomplicar o dinheiro — investimentos, mercado financeiro e negócios, direto ao ponto e sem enrolação.\n\nEm vez de perder horas em podcasts e aulas intermináveis, nós descodificamos a economia para si. Trazemos os melhores cortes sobre investimentos, educação financeira, empreendedorismo e os números que ninguém te mostra — em pequenos \"bits\" de alto impacto.\n\nFocamo-nos na lógica, nos factos e nos números reais: derrubamos mitos de dinheiro, mostramos o erro caro e desmascaramos o que o banco não quer que você saiba. Nada de promessa de dinheiro fácil — informação prática para você decidir melhor.\n\nSe procura clareza financeira, inteligência e as melhores discussões sobre dinheiro do Brasil:\n🔔 Inscreva-se agora, ative o sino e comece a fazer o seu dinheiro trabalhar!\n\n🌐 Fazemos parte da Rede Bits. Conheça também o nosso canal irmão: Política em Bits.",
+      "niche": "Cortes de podcasts, palestras e entrevistas sobre economia, mercado financeiro e negócios: investimentos, educação financeira e empreendedorismo, em linguagem direta e sem enrolação (pt-BR). Faz parte da Rede Bits (irmão de Política em Bits). Estética 8-bit pixel art, navy + verde neon.",
+      "keywords": [
+        "economia",
+        "mercado financeiro",
+        "investimentos",
+        "educação financeira",
+        "empreendedorismo",
+        "negócios",
+        "finanças pessoais",
+        "renda fixa",
+        "bolsa de valores",
+        "economia de bits",
+        "juros compostos",
+        "cortes de finanças"
+      ],
       "copy_profile": "financas",
       "credentials_dir": "secrets/youtube/negocios",
       "default": false,
@@ -79,6 +133,23 @@
         "short_outro": "assets/short-end/negocios.mp4",
         "corte_outro": "assets/corte-end/negocios.mp4",
         "accent_color": "#39FF14"
+      },
+      "design": {
+        "aesthetic": "8-bit pixel art com fundo navy escuro e destaque em verde neon (#39FF14) — energético, tech e financeiro. Nome centralizado em fonte de bloco 8-bit com efeito neon verde brilhante; iconografia de finanças (moeda, gráfico de candlestick, seta de alta).",
+        "palette": {
+          "background": "#0A1A2F",
+          "navy": "#0B1D3A",
+          "neon_green": "#39FF14",
+          "white": "#FFFFFF",
+          "silver": "#C0C0C0",
+          "mode": "navy-neon"
+        },
+        "prompts": {
+          "logo": "A minimalist 8-bit pixel art icon of a glowing coin stamped with a rising candlestick chart / upward arrow, floating in the center. Pixelated texture in neon green (#39FF14) and white highlights over a solid dark navy background, with faint neon-green sparks radiating from it. Clean, symmetrical, high contrast, NO TEXT, video game UI asset style.",
+          "banner": "A high-definition, cinematic YouTube banner (2560 x 1440 pixels) for a finance and economy channel named 'ECONOMIA DE BITS'. Dark navy blue background (a deep textured digital abyss) with a neon-green accent palette (#39FF14), white and silver highlights. On the far left and far right edges, abstract 8-bit pixelated stock-chart candlesticks, rising line graphs and digital network lines flow inward toward the center. Positioned in the precise horizontal and vertical center, as the main focal point, is the text 'ECONOMIA DE BITS' in a large, bold, stylized 8-bit block font with a glowing neon-green and white effect; 'ECONOMIA' above 'DE BITS', perfectly centered within the central safe zone (middle 1546 x 423 pixels). In the bottom right corner of the safe zone, a small 8-bit pixel-art 'Subscribe Bell' with pixelated text 'INSCREVA-SE', glowing faintly in neon green. No other logos or watermarks. High contrast, cinematic lighting. Aspect ratio 16:9.",
+          "outro_short": "A 10-second, 9:16 vertical (1080x1920) end-screen animation for the YouTube channel 'ECONOMIA DE BITS'. Dark navy background with neon-green (#39FF14), white and silver accents. Faint 8-bit pixelated candlestick charts and rising line graphs pulse softly across the background. Upper-center: an 8-bit pixel-art glowing coin with a rising chart/upward arrow floats and gently bobs in neon green. Below it, the text 'ECONOMIA DE BITS' animates in with a glowing neon-green-and-white 8-bit block font, 'ECONOMIA' above 'DE BITS', centered. Lower-center: a large 8-bit pixel-art 'Subscribe Bell' rings/shakes with neon-green sparks, next to pulsing pixelated text 'INSCREVA-SE'. At the very bottom, small pixelated text 'Rede Bits'. Timed on-screen call-to-action buttons, in 8-bit pixel art with a neon-green glow, animate in sync with the voiceover: during the FIRST half, as she says 'Deixa seu like, comenta sua opinião', a LIKE (thumbs-up), a COMMENT (speech bubble) and a SHARE (arrow) button pop in one after another, lower-center, each with a small bounce and glow; then in the SECOND half, as she says 'se inscreve', those three fade out and a large SUBSCRIBE button (the bell + 'INSCREVA-SE') slides in front-and-center and pulses/highlights. Smooth loopable retro-arcade motion, high contrast, cinematic lighting, no photorealistic elements, no watermarks. Generate with audio: a soft, low 8-bit chiptune music bed under a warm, friendly female voiceover in natural Brazilian Portuguese — pleasant, calm and welcoming, with broad appeal for all audiences, perfectly clear and mixed loud above the music, well-articulated and unhurried so the whole line fits comfortably in the 10 seconds — the voice says: 'Esse foi mais um corte do Economia de Bits! Curtiu? Deixa seu like, comenta sua opinião e se inscreve pra continuar fazendo seu dinheiro trabalhar por você. Até a próxima!'",
+          "outro_corte": "A 10-second, 16:9 horizontal (1920x1080) end-screen animation for the YouTube channel 'ECONOMIA DE BITS'. Dark navy background with neon-green (#39FF14), white and silver accents. On the far left and right edges, 8-bit pixelated candlestick charts, rising line graphs and network lines flow inward and pulse. Center-left: an 8-bit pixel-art glowing coin with a rising chart/upward arrow gently bobbing in neon green. Center: the text 'ECONOMIA DE BITS' animates in with a glowing neon-green-and-white 8-bit block font, 'ECONOMIA' above 'DE BITS', centered in the safe zone. Right side: a large 8-bit pixel-art 'Subscribe Bell' ringing with neon-green sparks, next to pulsing pixelated text 'INSCREVA-SE'. Bottom-right corner: small pixelated text 'Rede Bits'. Timed on-screen call-to-action buttons, in 8-bit pixel art with a neon-green glow, animate in sync with the voiceover: during the FIRST half, as she says 'Deixa seu like, comenta sua opinião', a LIKE (thumbs-up), a COMMENT (speech bubble) and a SHARE (arrow) button pop in one after another, lower-center, each with a small bounce and glow; then in the SECOND half, as she says 'se inscreve', those three fade out and a large SUBSCRIBE button (the bell + 'INSCREVA-SE') slides in front-and-center and pulses/highlights. Smooth retro-arcade motion, high contrast, cinematic lighting, no photorealistic elements, no watermarks. Generate with audio: a soft, low 8-bit chiptune music bed under a warm, friendly female voiceover in natural Brazilian Portuguese — pleasant, calm and welcoming, with broad appeal for all audiences, perfectly clear and mixed loud above the music, well-articulated and unhurried so the whole line fits comfortably in the 10 seconds — the voice says: 'Esse foi mais um corte do Economia de Bits! Curtiu? Deixa seu like, comenta sua opinião e se inscreve pra continuar fazendo seu dinheiro trabalhar por você. Até a próxima!'"
+        }
       },
       "transform": {
         "speed": 1.05,
@@ -127,6 +198,108 @@
         "#empreendedorismo",
         "#negocios",
         "#economia"
+      ]
+    },
+    {
+      "platform": "youtube",
+      "id": "futebol",
+      "label": "Futebol em Bits",
+      "channel_name": "Futebol em Bits",
+      "handle": "@futebolembits",
+      "url": "https://www.youtube.com/@futebolembits",
+      "_handle_url_note": "CONFIRMAR: handle/url seguem o padrão dos irmãos (@politicaembit / @economiadebits); NÃO confirmados por fonte. Corrigir com o handle real do canal já criado no YouTube.",
+      "description": "Bem-vindo ao Futebol em Bits! ⚡ O seu radar diário para os debates mais quentes do futebol — as opiniões, as tretas e os embates que incendeiam a mesa redonda.\n\nEm vez de perder horas assistindo a programas esportivos e podcasts intermináveis, nós descodificamos o futebol para si. Trazemos os melhores cortes: as opiniões mais polêmicas, os embates entre comentaristas, as declarações que ninguém esquece e tudo o que dá o que falar — em pequenos \"bits\" de alto impacto.\n\nFocamo-nos na emoção, no confronto de ideias e na paixão que só o futebol tem — dos gramados brasileiros aos gigantes europeus, sem torcer para lado nenhum a não ser o do melhor debate.\n\nSe você vive de futebol e adora uma boa discussão de bola:\n🔔 Inscreva-se agora, ative o sino e entre no debate!\n\n🌐 Fazemos parte da Rede Bits. Conheça também os nossos canais irmãos: Política em Bits e Economia de Bits.",
+      "niche": "Cortes de debate e polêmica de futebol (programas esportivos, mesas redondas, podcasts e entrevistas): opiniões quentes, embates entre comentaristas, declarações polêmicas e treta de bastidor. Escopo global/livre — futebol brasileiro, brasileiros no exterior, ligas e clubes europeus, seleções — sem clube de estimação, o único lado é o do melhor debate (pt-BR). Faz parte da Rede Bits (irmão de Política em Bits e Economia de Bits). Estética 8-bit pixel art, midnight + azul elétrico.",
+      "keywords": [
+        "futebol",
+        "debate de futebol",
+        "polêmica no futebol",
+        "cortes de futebol",
+        "mesa redonda futebol",
+        "opinião futebol",
+        "brasileirão",
+        "champions league",
+        "futebol brasileiro",
+        "futebol em bits",
+        "comentaristas de futebol",
+        "treta no futebol"
+      ],
+      "copy_profile": "futebol",
+      "credentials_dir": "secrets/youtube/futebol",
+      "default": false,
+      "daily_upload_limit": 100,
+      "brand": {
+        "short_frame": "assets/short-frame/futebol.png",
+        "corte_frame": "assets/corte-frame/futebol.png",
+        "short_outro": "assets/short-end/futebol.mp4",
+        "corte_outro": "assets/corte-end/futebol.mp4",
+        "short_bg_color": "#060B18",
+        "accent_color": "#00A8FF"
+      },
+      "design": {
+        "aesthetic": "8-bit pixel art com fundo midnight (quase-preto azulado) e destaque em azul elétrico (#00A8FF) + ciano — energético, esportivo e moderno, deliberadamente distinto do cinza/prata do Política e do verde neon do Economia. Nome centralizado em fonte de bloco 8-bit com efeito neon azul brilhante; iconografia de futebol/debate (bola de futebol clássica preto-branco com glow azul, balão de fala, apito, troféu).",
+        "palette": {
+          "background": "#060B18",
+          "midnight": "#0B1524",
+          "electric_blue": "#00A8FF",
+          "cyan": "#22D3FF",
+          "white": "#FFFFFF",
+          "mode": "midnight-electric-blue"
+        },
+        "prompts": {
+          "logo": "A minimalist 8-bit pixel art icon of a classic soccer ball (black-and-white pentagon pattern) floating in the center, wrapped in a glowing electric-blue neon outline. Pixelated texture with electric-blue (#00A8FF) and cyan highlights over a solid dark midnight-blue background, with faint electric-blue sparks radiating from it. Clean, symmetrical, high contrast, NO TEXT, video game UI asset style.",
+          "banner": "A high-definition, cinematic YouTube banner (2560 x 1440 pixels) for a football/soccer debate channel named 'FUTEBOL EM BITS'. Dark midnight-blue background (a deep textured digital abyss) with an electric-blue accent palette (#00A8FF), cyan and white highlights. On the far left and far right edges, abstract 8-bit pixelated soccer balls, speech bubbles, referee whistles, rising line graphs and digital network lines flow inward toward the center. Positioned in the precise horizontal and vertical center, as the main focal point, is the text 'FUTEBOL EM BITS' in a large, bold, stylized 8-bit block font with a glowing electric-blue and white effect; 'FUTEBOL' above 'EM BITS', perfectly centered within the central safe zone (middle 1546 x 423 pixels). In the bottom right corner of the safe zone, a small 8-bit pixel-art 'Subscribe Bell' with pixelated text 'INSCREVA-SE', glowing faintly in electric blue. No other logos or watermarks. High contrast, cinematic lighting. Aspect ratio 16:9.",
+          "outro_short": "A 10-second, 9:16 vertical (1080x1920) end-screen animation for the YouTube channel 'FUTEBOL EM BITS'. Dark midnight-blue background with electric-blue (#00A8FF), cyan and white accents. Faint 8-bit pixelated soccer balls, speech bubbles and network lines pulse softly across the background. Upper-center: an 8-bit pixel-art classic black-and-white soccer ball with an electric-blue neon glow floats and gently bobs. Below it, the text 'FUTEBOL EM BITS' animates in with a glowing electric-blue-and-white 8-bit block font, 'FUTEBOL' above 'EM BITS', centered. Lower-center: a large 8-bit pixel-art 'Subscribe Bell' rings/shakes with electric-blue sparks, next to pulsing pixelated text 'INSCREVA-SE'. At the very bottom, small pixelated text 'Rede Bits'. Timed on-screen call-to-action buttons, in 8-bit pixel art with an electric-blue glow, animate in sync with the voiceover: during the FIRST half, as she says 'Deixa seu like, comenta de que lado você tá', a LIKE (thumbs-up), a COMMENT (speech bubble) and a SHARE (arrow) button pop in one after another, lower-center, each with a small bounce and glow; then in the SECOND half, as she says 'se inscreve', those three fade out and a large SUBSCRIBE button (the bell + 'INSCREVA-SE') slides in front-and-center and pulses/highlights. Smooth loopable retro-arcade motion, high contrast, cinematic lighting, no photorealistic elements, no watermarks. Generate with audio: a soft, low 8-bit chiptune music bed under a warm, friendly female voiceover in natural Brazilian Portuguese — pleasant, calm and welcoming, with broad appeal for all audiences, perfectly clear and mixed loud above the music, well-articulated and unhurried so the whole line fits comfortably in the 10 seconds — the voice says: 'Esse foi mais um corte do Futebol em Bits! Curtiu? Deixa seu like, comenta de que lado você tá e se inscreve pra não perder nenhum debate. Até a próxima!'",
+          "outro_corte": "A 10-second, 16:9 horizontal (1920x1080) end-screen animation for the YouTube channel 'FUTEBOL EM BITS'. Dark midnight-blue background with electric-blue (#00A8FF), cyan and white accents. On the far left and right edges, 8-bit pixelated soccer balls, speech bubbles, referee whistles and network lines flow inward and pulse. Center-left: an 8-bit pixel-art classic black-and-white soccer ball with an electric-blue neon glow gently bobbing. Center: the text 'FUTEBOL EM BITS' animates in with a glowing electric-blue-and-white 8-bit block font, 'FUTEBOL' above 'EM BITS', centered in the safe zone. Right side: a large 8-bit pixel-art 'Subscribe Bell' ringing with electric-blue sparks, next to pulsing pixelated text 'INSCREVA-SE'. Bottom-right corner: small pixelated text 'Rede Bits'. Timed on-screen call-to-action buttons, in 8-bit pixel art with an electric-blue glow, animate in sync with the voiceover: during the FIRST half, as she says 'Deixa seu like, comenta de que lado você tá', a LIKE (thumbs-up), a COMMENT (speech bubble) and a SHARE (arrow) button pop in one after another, lower-center, each with a small bounce and glow; then in the SECOND half, as she says 'se inscreve', those three fade out and a large SUBSCRIBE button (the bell + 'INSCREVA-SE') slides in front-and-center and pulses/highlights. Smooth retro-arcade motion, high contrast, cinematic lighting, no photorealistic elements, no watermarks. Generate with audio: a soft, low 8-bit chiptune music bed under a warm, friendly female voiceover in natural Brazilian Portuguese — pleasant, calm and welcoming, with broad appeal for all audiences, perfectly clear and mixed loud above the music, well-articulated and unhurried so the whole line fits comfortably in the 10 seconds — the voice says: 'Esse foi mais um corte do Futebol em Bits! Curtiu? Deixa seu like, comenta de que lado você tá e se inscreve pra não perder nenhum debate. Até a próxima!'"
+        }
+      },
+      "transform": {
+        "speed": 1.05,
+        "pitch_semitones": 0.85,
+        "eq": true,
+        "eq_notch": true,
+        "noise": 10,
+        "music": true,
+        "music_volume": 0.05,
+        "music_lufs": -16,
+        "color": { "contrast": 1.12, "saturation": 1.15, "gamma": 0.95 },
+        "zoom": 1.2,
+        "flip": true,
+        "jitter": 0.6
+      },
+      "thumbnail": {
+        "face_aware": true,
+        "intro_short": true,
+        "intro_duration_s": 0.1,
+        "rembg_model": "u2net"
+      },
+      "reframe": {
+        "enabled": true,
+        "min_segment_s": 1.2,
+        "margin": 0.35,
+        "min_crop_h": 0.7,
+        "fps": 5.0,
+        "max_frames": 4000,
+        "min_confidence": 0.15,
+        "cutaway": true,
+        "hook_punch": true,
+        "sfx_dir": "",
+        "sfx_volume": 0.5
+      },
+      "jumpcut": {
+        "enabled": true,
+        "min_gap_s": 1.2,
+        "buffer_s": 0.15
+      },
+      "default_hashtags": [
+        "#futebol",
+        "#futebolbrasileiro",
+        "#brasileirao",
+        "#debate",
+        "#championsleague",
+        "#polemica",
+        "#bola",
+        "#esporte"
       ]
     }
   ]

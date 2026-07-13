@@ -25,7 +25,7 @@ inscrever) e os icones ja vem EMBUTIDOS na propria arte PNG — o render NAO
 desenha texto de marca por cima (so as legendas de fala + a progress bar).
 
 WINDOW e a posicao/tamanho do retangulo transparente da arte atual
-(assets/short-frame/principal.png), medida UMA vez e fixada aqui. Se a arte
+(assets/short-frame/politica.png), medida UMA vez e fixada aqui. Se a arte
 mudar a janela, remedir e atualizar WINDOW. Para remedir (ffmpeg + numpy, via
 ALPHA — a janela agora e transparente, nao preta):
     raw = subprocess.run(["ffmpeg","-v","error","-i",PNG,"-vf","scale=1080:1920",
@@ -40,7 +40,7 @@ from .frame_common import build_video_stage, even
 CANVAS_W, CANVAS_H = 1080, 1920
 
 # Janela do video (x, y, w, h) no canvas 1080x1920 = retangulo transparente da
-# arte assets/short-frame/principal.png (medido via alpha). Video crop-to-fill
+# arte assets/short-frame/politica.png (medido via alpha). Video crop-to-fill
 # preenche esta janela por inteiro (sem barra preta).
 WINDOW = (20, 0, 1040, 1545)
 

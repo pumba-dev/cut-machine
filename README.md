@@ -201,7 +201,7 @@ Desvios (`rejected` / `failed`) sempre carregam um campo `error` obrigatório. F
 | `media.py` | Wrappers de ffprobe/ffmpeg (metadados, duração). |
 | `diarize.py` | Diarização sherpa-onnx (CPU, sem torch/token): `spk` por palavra → cor por falante. |
 | `sources/` | Abstração de **fonte**: `VideoSource.matches()/fetch()` + `get_source(url)`. Hoje `youtube.py`. |
-| `transcribe/` | `whisper_local.py` — faster-whisper `large-v3` int8 (GTX 1660: nunca fp16). |
+| `transcribe/` | `whisper_local.py` — faster-whisper `large-v3` int8 batched (GTX 1660: nunca fp16) + diarização concorrente. |
 | `render/` | `short_frame.py`, `corte_frame.py` (janela + arte PNG), `captions.py` (.ass), `branding.py` (moldura fallback), `thumbnail.py` (miniatura), `ffmpeg.py` (grafo de filtros). |
 | `publishers/` | Abstração de **destino**: `Publisher.authenticate()/upload()` + `get_publisher(platform)`. Hoje `youtube.py` + `upload_log.py` (controle de quota). |
 
@@ -292,7 +292,7 @@ CLIs diretas:
 
 ```
 python scripts/download.py    --url <URL>
-python scripts/transcribe.py  --video-id <id> [--model large-v3] [--device auto|cuda|cpu] [--compute int8] [--speakers N]
+python scripts/transcribe.py  --video-id <id> [--model large-v3] [--device auto|cuda|cpu] [--compute int8] [--batch-size 4] [--speakers N]
 python scripts/diarize.py     --video-id <id> [--speakers N] [--force]
 python scripts/render_clip.py --video-id <id> [--clip <clip_id>] [--all-approved]
 python scripts/upload_clip.py --video-id <id> --clip <clip_id> [--platform youtube] [--account <account_id>]
@@ -317,7 +317,7 @@ pip install -r requirements.txt      # yt-dlp, faster-whisper, ctranslate2, sher
 Autentique uma conta antes do primeiro upload:
 
 ```bash
-python scripts/auth.py --platform youtube --account principal
+python scripts/auth.py --platform youtube --account politica
 ```
 
 As contas ficam em [`config/accounts.json`](config/accounts.json) (identidade editorial: nome do

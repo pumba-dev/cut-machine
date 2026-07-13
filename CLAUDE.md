@@ -29,7 +29,7 @@ download -> transcribe -> faces* -> speaker-track* -> plan -> copy -> [thumbnail
 | Tarefa | Quem |
 |---|---|
 | Download + metadados | `scripts/download.py` (yt-dlp via `core/sources`) |
-| Transcrição word-level | `scripts/transcribe.py` (faster-whisper CUDA) |
+| Transcrição word-level | `scripts/transcribe.py` (faster-whisper CUDA, batched + diarização concorrente) |
 | Seleção de momentos virais, start/end finos | **clip-scout** (LLM) |
 | Títulos, descrições, tags | **copywriter** (LLM) |
 | Detecção de rosto/emoção + host (`faces.json`) | `scripts/analyze_faces.py` (opencv/onnx CPU; opt-in) |
@@ -66,7 +66,7 @@ download -> transcribe -> faces* -> speaker-track* -> plan -> copy -> [thumbnail
 
 ```
 python scripts/download.py     --url <URL>
-python scripts/transcribe.py   --video-id <id> [--model large-v3] [--device auto|cuda|cpu] [--compute int8] [--no-diarize] [--speakers N]
+python scripts/transcribe.py   --video-id <id> [--model large-v3] [--device auto|cuda|cpu] [--compute int8] [--batch-size 4] [--no-diarize] [--speakers N]
 python scripts/diarize.py      --video-id <id> [--speakers N] [--force]
 python scripts/analyze_faces.py --video-id <id> [--account <id>] [--interval 2.0] [--max-frames 2500] [--force]
 python scripts/track_speaker.py --video-id <id> [--account <id>] [--fps 5.0] [--max-frames 4000] [--force]
@@ -78,6 +78,9 @@ python scripts/classify_music.py [--force] [--dry-run] [--report <path>]
 ```
 
 Render é **sequencial** por clip (GPU 6GB não comporta paralelismo folgado).
+
+**Transcrição (performance)**: `transcribe.py` usa `BatchedInferencePipeline` na GPU por padrão (`--batch-size 4`; decodifica vários chunks-VAD em paralelo — ~1.6× sobre o stream single-pass antigo) e roda a **diarização (CPU) concorrente com o Whisper (GPU)** — o custo da diarização fica escondido sob o Whisper (`core/transcribe/whisper_local.py`). O caminho batched força `condition_on_previous_text=False`, o que **reduz alucinação/repetição** em áudio longo. `--batch-size 1` volta ao modo streaming legado; CPU/fallback ignora batching. VRAM: batch 4 = pico ~5.5GB dos 6GB (com desktop aberto); OOM auto-halva o batch e recarrega. **Preset de throughput opt-in**: `--model deepdml/faster-whisper-large-v3-turbo-ct2 --batch-size 8` (~21× realtime, VRAM ~3.3GB, baixa o modelo no 1º uso; timestamps ~2-3× menos precisos que large-v3 → só quando a precisão do corte/legenda não for crítica). **A diarização é hoje o piso do wall-clock** (~0.24× a duração do áudio, thread-invariante — subir `DIARIZE_*_THREADS` não acelera, medido); `int8` continua obrigatório (fp16=NaN na série 16xx).
+
 `transcribe.py` já diariza os falantes por padrão (grava `spk`/`speaker` no `transcript.json` → cor por falante nas legendas). Modo automático usa teto de clusters + fusão dos micro-clusters de ruído (contagem por threshold é inutilizável — dependente da duração). `diarize.py` só é preciso para **retrofit** de transcript antigo ou re-diarizar com `--speakers N` (número exato, caminho confiável). Diarização roda em CPU (sem VRAM), baixa modelos ONNX sob demanda em `models/` no 1º uso e falha degrada para cor única (não derruba a transcrição). **Confira `transcript.json.speakers` após transcrever**: se destoar do esperado (podcast costuma ter 2–3), re-rode `diarize.py --speakers N --force` com o número real.
 
 ## 6. Subagentes (Task)
@@ -87,7 +90,7 @@ Render é **sequencial** por clip (GPU 6GB não comporta paralelismo folgado).
 | `clip-scout` | após `transcribe` done | lê `transcript.compact.json` + `references/heuristicas-virais.md`; escreve clips `planned` em `clips.json` (start/end, hook, score, rationale, `thumbnail_ts`) |
 | `copywriter` | após `plan` done | preenche `title`, `title_alts`, `description`, `tags`, `thumbnail_text` dos clips `planned` (lê `padrao-copy.md` universal **+** `references/copy/<copy_profile>.md` do nicho da conta) |
 | `thumbnail-director` | após `copy`, **se** conta opt-in + `faces.json` ok (opcional) | lê `faces.json` + `thumbnail_text`; escreve `thumbnail_plan` (frame_ts, rosto/host, layout) nos clips `planned` — usado pela thumb compositada |
-| `qa-reviewer` | após `render` | ffprobe em cada mp4 (resolução, duração ±0.5s, áudio); aprova → carimba `qa.status: "pass"` (mantém `rendered`, libera auto-publish) ou marca `failed`/`rejected` + `qa.status: "fail"` |
+| `qa-reviewer` | após `render` | ffprobe em cada mp4 (resolução, duração ±0.5s, áudio) + **presença de rosto** em clips com reframe (`core/faces/presence.py`: amostra frames do conteúdo, YuNet; fração baixa = crop dinâmico apontando pro vazio → `failed`); aprova → carimba `qa.status: "pass"` (mantém `rendered`, libera auto-publish) ou marca `failed`/`rejected` + `qa.status: "fail"` |
 | `publisher` | só após aprovação explícita do usuário | roda `upload_clip.py` por clip, valida retorno, registra `publish.*`; em `quotaExceeded` para tudo e reporta |
 
 Passe sempre no prompt do subagente: `video_id`, **`account_id` (obrigatório — sem default; o mesmo de todo o pipeline daquele vídeo)**, caminho da pasta do vídeo (`video-output/<video_id>`) e o que se espera de volta (resumo curto, não o JSON inteiro).
@@ -107,8 +110,9 @@ Passe sempre no prompt do subagente: `video_id`, **`account_id` (obrigatório �
 
 | id | canal | nicho | `copy_profile` | default |
 |---|---|---|---|---|
-| `principal` | Missão no Nordeste | política (partido Missão/MBL, direita liberal, eleições 2026) | `politica` | sim |
+| `politica` | Política em Bits | política brasileira geral (Congresso, debates, bastidores; direita liberal/terceira via, eleições 2026) | `politica` | sim |
 | `negocios` | Economia de Bits | finanças/economia/negócios (investimentos, educação financeira, empreendedorismo) | `financas` | não |
+| `futebol` | Futebol em Bits | debate/polêmica de futebol (mesas redondas, opinião quente, treta; escopo global — BR + europeu, sem clube fixo) | `futebol` | não |
 
 - **Conta é sempre explícita.** `/produzir` e `/planejar` exigem `--conta <id>`; se faltar, **PARE e pergunte** — nunca caia no default silencioso. Com 2+ canais, assumir a conta errada mistura os canais (brand do render, nicho da copy e canal do upload errados) e é difícil de desfazer. A flag `"default"` de `accounts.json` só resolve chamadas diretas de script de manutenção, **não** a produção de um vídeo.
 - Contas em `config/accounts.json`; credenciais isoladas em `secrets/<plataforma>/<conta>/`.

@@ -38,9 +38,9 @@ Guie o usuario pelo walkthrough resumido abaixo. Detalhes completos (prints de t
 3. Configurar a **OAuth consent screen**: tipo External, modo **Testing**, adicionar o e-mail do proprio usuario como *test user*.
    - Importante: em modo Testing o refresh token **expira em 7 dias** — sera preciso re-rodar `scripts/auth.py` semanalmente (o /status alerta).
 4. Criar credencial **OAuth client ID** do tipo **Desktop app** e baixar o JSON.
-5. Crie o diretorio de credenciais da conta default (`config/accounts.json` -> conta `principal`):
-   - `secrets/youtube/principal/`
-   - Oriente o usuario a salvar o JSON baixado como `secrets/youtube/principal/credentials.json`.
+5. Crie o diretorio de credenciais da conta default (`config/accounts.json` -> conta `politica`):
+   - `secrets/youtube/politica/`
+   - Oriente o usuario a salvar o JSON baixado como `secrets/youtube/politica/credentials.json`.
    - **Nunca leia nem imprima o conteudo desse arquivo** — apenas confirme que ele existe.
 
 ## 5. Primeira autenticacao
@@ -51,7 +51,7 @@ Com `credentials.json` no lugar:
 python scripts/auth.py --platform youtube
 ```
 
-O script abre o browser para o consentimento OAuth e salva `token.json` em `secrets/youtube/principal/`. A ultima linha do stdout e JSON `{"ok": ...}` — confira `ok: true`. Se `token.json` ja existir e for valido, o script emite `{"ok": true, "skipped": true}` (nao refaca nada).
+O script abre o browser para o consentimento OAuth e salva `token.json` em `secrets/youtube/politica/`. A ultima linha do stdout e JSON `{"ok": ...}` — confira `ok: true`. Se `token.json` ja existir e for valido, o script emite `{"ok": true, "skipped": true}` (nao refaca nada).
 
 ## Resumo final
 

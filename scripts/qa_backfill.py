@@ -8,6 +8,10 @@ existir e (2) rede de seguranca / re-verificacao em massa.
 Por clip com status 'rendered':
   - probe o mp4; confere resolucao exata, duracao (contracts.expected_output_duration,
     +-0.5s -- end-start ou render.content_duration_s se o jump-cut mudou a duracao) e audio;
+  - presenca de rosto (SO se o clip usou reframe, render.reframe.applied): amostra
+    frames do conteudo (fora de intro/vinheta) e mede a fracao com rosto; fracao
+    baixa = reframe apontando pro vazio -> status 'failed'. Degrada seguro (sem
+    cv2/modelos ou video ilegivel: pula o check, nunca reprova a toa);
   - audio_risk == true -> status 'rejected' + qa.fail (mesmo com tecnica ok);
   - tudo ok -> qa.status 'pass' (mantem 'rendered');
   - check falhou -> status 'failed' + error + qa.fail.
@@ -25,7 +29,36 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core import contracts, paths
 from core.cli import emit
+from core.faces.presence import sample_face_fraction
 from core.media import video_info
+
+# Presenca de rosto (so em clips com reframe): abaixo desta fracao de frames
+# amostrados com rosto, o crop dinamico provavelmente aponta pro vazio. Baixo de
+# proposito -> o bug produz fracao ~0; um reframe bom fica >=0.6. Assim so pega
+# os claramente quebrados, sem reprovar clips com trechos legitimos sem rosto.
+FACE_MIN_FRAC = 0.35
+
+
+def _face_check(clip: dict, mp4: Path, info: dict) -> str | None:
+    """Note de reprovacao se o reframe deixou o clip sem rosto; None se ok/n-a.
+
+    So roda quando render.reframe.applied (o bug e do crop dinamico). Amostra a
+    regiao de CONTEUDO (fora de intro/vinheta, que legitimamente nao tem rosto).
+    Indeterminado (sem cv2/modelos, video ilegivel) -> None (nao reprova)."""
+    render = clip.get("render") or {}
+    if not (render.get("reframe") or {}).get("applied"):
+        return None
+    t0 = float(render.get("intro_duration_s") or 0.0)
+    t1 = float(info["duration_s"]) - float(render.get("outro_duration_s") or 0.0)
+    res = sample_face_fraction(mp4, t0, t1)
+    if res is None:
+        return None
+    frac, hit, used = res
+    if frac < FACE_MIN_FRAC:
+        return (f"reframe sem rosto: rosto em {hit}/{used} frames amostrados "
+                f"({frac:.0%} < {FACE_MIN_FRAC:.0%}) — crop dinamico provavelmente "
+                f"apontando pro vazio (revisar speaker_track/reframe)")
+    return None
 
 
 def _check(clip: dict, mp4: Path) -> tuple[str, str | None]:
@@ -54,6 +87,10 @@ def _check(clip: dict, mp4: Path) -> tuple[str, str | None]:
 
     if not info["has_audio"]:
         return "failed", "sem stream de audio"
+
+    face_note = _face_check(clip, mp4, info)
+    if face_note:
+        return "failed", face_note
 
     if clip.get("audio_risk"):
         return "rejected", "audio_risk: transcricao de baixa confianca no trecho"

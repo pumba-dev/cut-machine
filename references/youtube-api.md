@@ -8,7 +8,7 @@ Como configurar credenciais e o que esperar do upload via YouTube Data API v3. P
 2. **APIs & Services → Library → "YouTube Data API v3" → Enable**.
 3. **OAuth consent screen**: User Type `External`, modo **Testing**. Adicionar a conta Google dona do canal em **Test users** (sem isso o login falha com `access_denied`).
 4. **Credentials → Create Credentials → OAuth client ID →** Application type **Desktop app** → baixar o JSON.
-5. Salvar o JSON como `secrets/youtube/<conta>/credentials.json` — o diretório exato vem de `credentials_dir` da conta em `config/accounts.json` (ex.: `secrets/youtube/principal/credentials.json`).
+5. Salvar o JSON como `secrets/youtube/<conta>/credentials.json` — o diretório exato vem de `credentials_dir` da conta em `config/accounts.json` (ex.: `secrets/youtube/politica/credentials.json`).
 6. Rodar `python scripts/auth.py --platform youtube --account <conta>`: abre o navegador (installed-app flow), pede consentimento e grava `secrets/youtube/<conta>/token.json`. Escopos: `youtube.upload` (subir vídeo + `thumbnails.set`) + `youtube.readonly` (reler status/estatísticas via `videos.list`). **Mudança de escopo exige re-consentimento**: apague `token.json` (ou deixe o refresh falhar) e re-rode `auth.py` para reautorizar com os dois escopos.
 
 `secrets/` inteiro é gitignored; `credentials.json` e `token.json` nunca entram em commit.
@@ -88,9 +88,9 @@ Cada conta é uma entrada em `config/accounts.json` com diretório de credenciai
  "accounts": [
   {
    "platform": "youtube",
-   "id": "principal",
+   "id": "politica",
    "label": "Canal principal",
-   "credentials_dir": "secrets/youtube/principal",
+   "credentials_dir": "secrets/youtube/politica",
    "default": true,
    "daily_upload_limit": 5
   },

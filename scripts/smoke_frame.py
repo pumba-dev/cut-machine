@@ -61,7 +61,7 @@ def main() -> None:
     ap.add_argument("--format", choices=["short", "corte"], default="short")
     ap.add_argument("--video-id", default=None)
     ap.add_argument("--clip", default=None, help="clip_id especifico do formato")
-    ap.add_argument("--account", default="principal")
+    ap.add_argument("--account", default="politica")
     ap.add_argument("--seconds", type=float, default=8.0,
                     help="duracao do preview em s (0 ou --full = clip inteiro)")
     ap.add_argument("--full", action="store_true", help="renderiza o clip inteiro")

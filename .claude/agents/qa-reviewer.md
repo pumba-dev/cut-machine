@@ -42,11 +42,19 @@ As regras canônicas estão em `core/contracts.py` (`FORMAT_RULES`):
    - **texto cobre a pessoa?** os chips de gancho (faixas pretas/amarelas) ou a frase de impacto não podem tampar o rosto/olhos do recorte.
    Registre o veredito na coluna `thumb_visual` da tabela (`ok` / `sem pessoa` / `texto cobre rosto` / `n/a` se não for `local_composite`). Isso é sinal para o orquestrador decidir se vale regenerar a thumb (troca de `frame_ts`/`thumbnail_plan`) — não reprova o clip nem bloqueia publish.
 
-3. **Risco de áudio:** se `clip.audio_risk == true`, rebaixe o clip para `rejected` com `error` explicando (ex.: "transcricao de baixa confianca no trecho (prob media < 0.5); revisar audio antes de publicar") — mesmo que os checks técnicos passem. Publicar clip com legenda potencialmente errada é pior que não publicar.
+3. **Presença de rosto (SÓ clips com reframe; reprova):** o reframe dinâmico (`render.reframe.applied == true`) corta a "câmera" ao redor do falante — quando o `speaker_track` erra, o crop aponta pro vazio e o vídeo sai SEM ninguém. Rode o check determinístico (amostra frames do CONTEÚDO, fora de intro/vinheta, e mede a fração com rosto via YuNet):
 
-4. **Veredito via Edit** em `clips.json` (o clip permanece `rendered`; o QA carimba o bloco `qa`):
+   ```
+   python -c "from core import contracts, paths; from core.media import video_info; from core.faces.presence import sample_face_fraction; c=contracts.get_clip(contracts.load_plan(paths.clips_path('<video_id>')), '<clip_id>'); r=c.get('render') or {}; mp4=paths.clip_output_path('<video_id>','<clip_id>'); info=video_info(mp4); print(sample_face_fraction(mp4, float(r.get('intro_duration_s') or 0), info['duration_s']-float(r.get('outro_duration_s') or 0)) if (r.get('reframe') or {}).get('applied') else 'n/a')"
+   ```
+
+   Retorna `(fracao, n_com_rosto, n_amostrados)`, `n/a` (sem reframe) ou `None` (indeterminado — sem modelos/vídeo ilegível). Regra: `fracao < 0.35` -> `status: "failed"` + `error` ("reframe sem rosto: crop apontando pro vazio; revisar speaker_track/reframe") + `qa.fail`. `n/a`/`None` -> não reprova por isso. (Se quiser confirmar visualmente, extraia 1-2 frames do meio do conteúdo com ffmpeg e abra com Read.)
+
+4. **Risco de áudio:** se `clip.audio_risk == true`, rebaixe o clip para `rejected` com `error` explicando (ex.: "transcricao de baixa confianca no trecho (prob media < 0.5); revisar audio antes de publicar") — mesmo que os checks técnicos passem. Publicar clip com legenda potencialmente errada é pior que não publicar.
+
+5. **Veredito via Edit** em `clips.json` (o clip permanece `rendered`; o QA carimba o bloco `qa`):
    - todos os checks ok e sem `audio_risk` -> adicione o bloco `"qa": {"status": "pass", "note": null}` ao clip (mantém `status: "rendered"`). **Obrigatório**: sem `qa.status == "pass"` o `publish_next` não publica o clip;
-   - check técnico falhou -> `"status": "failed"` + `"error"` com a divergência exata (ex.: "resolucao 1080x1918, esperado 1080x1920") + `"qa": {"status": "fail", "note": "<mesma divergencia>"}`. `error` é obrigatório em `failed`;
+   - check técnico falhou (resolução/duração/áudio/**rosto do reframe**) -> `"status": "failed"` + `"error"` com a divergência exata (ex.: "resolucao 1080x1918, esperado 1080x1920") + `"qa": {"status": "fail", "note": "<mesma divergencia>"}`. `error` é obrigatório em `failed`;
    - `audio_risk` -> `"status": "rejected"` + `"error"` explicando + `"qa": {"status": "fail", "note": "audio_risk"}`.
 
 ## Restrições
@@ -61,7 +69,7 @@ As regras canônicas estão em `core/contracts.py` (`FORMAT_RULES`):
 Tabela markdown, uma linha por clip verificado:
 
 ```
-| clip_id | formato | resolucao | duracao (real vs esperada) | audio | audio_risk | thumb | thumb_visual | veredito |
+| clip_id | formato | resolucao | duracao (real vs esperada) | audio | audio_risk | rosto (reframe) | thumb | thumb_visual | veredito |
 ```
 
 Mais uma linha final: N aprovados (`qa.status: pass`, seguem `rendered`), N failed, N rejected.

@@ -433,7 +433,7 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
                 info["thumbnail_composite_error"] = str(exc) or exc.__class__.__name__
                 thumb = None
         if thumb is None:
-            thumb = generate_thumbnail(clip, video_id)
+            thumb = generate_thumbnail(clip, video_id, account)
             provider = "local"
         info["thumbnail_path"] = thumb["path"]
         info["thumbnail_ts"] = thumb["ts"]

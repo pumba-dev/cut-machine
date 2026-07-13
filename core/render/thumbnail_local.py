@@ -8,7 +8,7 @@ dela, nao uma repintura):
    blur + escurecido + saturado (visual dramatico de thumbnail);
 2. sujeito = recorte da pessoa (rembg) — enquadrado no HOST via `faces.json`
    (bbox do rosto que mais aparece perto do frame_ts) p/ isolar o apresentador
-   de eventuais convidados — com um GLOW amarelo de marca por baixo;
+   de eventuais convidados — com um GLOW na cor de marca da conta por baixo;
 3. texto = frase de impacto + ganchos queimados pelo motor ASS atual
    (`thumbnail.build_thumb_ass`) — mesmo estilo/zona segura das thumbs locais.
 
@@ -24,7 +24,20 @@ from ..contracts import FORMAT_RULES
 from ..faces import load_faces
 from .thumbnail import build_thumb_ass
 
-_ACCENT = (255, 217, 61)  # #FFD93D amarelo de marca
+_ACCENT = (255, 217, 61)  # #FFD93D amarelo (fallback sem brand.accent_color)
+
+
+def _hex_to_rgb(hex_color, default=_ACCENT):
+    """#RRGGBB (accent da conta) -> (r,g,b). Invalido -> default (amarelo)."""
+    if not isinstance(hex_color, str):
+        return default
+    h = hex_color.strip().lstrip("#")
+    if len(h) != 6:
+        return default
+    try:
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    except ValueError:
+        return default
 
 
 def _frame_ts(clip: dict) -> float:
@@ -122,7 +135,7 @@ def _host_crop(frame, bbox: list | None):
     return frame.crop((int(x0), int(y0), int(x0 + crop_w), fh))  # ate a base (tronco)
 
 
-def _compose_subject(bg, cutout, side: str, w: int, h: int):
+def _compose_subject(bg, cutout, side: str, w: int, h: int, glow_rgb=_ACCENT):
     from PIL import Image, ImageFilter
     # escala o recorte pela altura, limitando a largura.
     # center (short): sujeito dominante ~60%+. side (corte): ocupa ~metade,
@@ -147,9 +160,9 @@ def _compose_subject(bg, cutout, side: str, w: int, h: int):
         x = (w - tw) // 2
     y = h - target_h                                           # alinhado a base
 
-    # GLOW: silhueta amarela borrada por baixo (duas passadas p/ intensidade)
+    # GLOW: silhueta na cor de marca borrada por baixo (duas passadas p/ intensidade)
     alpha = cutout.split()[3]
-    sil = Image.new("RGBA", cutout.size, _ACCENT + (255,))
+    sil = Image.new("RGBA", cutout.size, tuple(glow_rgb) + (255,))
     sil.putalpha(alpha)
     glow = sil.filter(ImageFilter.GaussianBlur(radius=max(6, w // 70)))
     canvas = bg.copy()
@@ -160,12 +173,13 @@ def _compose_subject(bg, cutout, side: str, w: int, h: int):
 
 
 def _burn_text(clip: dict, composite_png: Path, out_jpg: Path, w: int, h: int,
-               region: str = "full") -> None:
+               region: str = "full", accent: str | None = None) -> None:
     """Queima impacto+ganchos (ASS, mesmo estilo das thumbs locais) sobre o PNG."""
     clip_dir = out_jpg.parent
     ass_path = paths.clip_thumbnail_ass_path(clip["video_id"], clip["id"]) \
         if clip.get("video_id") else clip_dir / f"{clip['id']}.thumb.ass"
-    ass_path.write_text(build_thumb_ass(clip, w, h, region=region), encoding="utf-8")
+    ass_path.write_text(build_thumb_ass(clip, w, h, region=region, accent=accent),
+                        encoding="utf-8")
     tmp = clip_dir / f"{out_jpg.stem}.tmp.jpg"
     cmd = ["ffmpeg", "-v", "error", "-i", "./" + composite_png.name,
            "-vf", f"ass={ass_path.name}", "-frames:v", "1", "-q:v", "2",
@@ -186,6 +200,9 @@ def generate_thumbnail_composite(clip: dict, video_id: str, tcfg: dict,
 
     fmt = clip["format"]
     w, h = (int(x) for x in FORMAT_RULES[fmt]["thumbnail_resolution"].split("x"))
+    # cor de marca da conta (glow do sujeito + texto); sem accent -> amarelo.
+    accent_hex = ((account or {}).get("brand") or {}).get("accent_color")
+    glow_rgb = _hex_to_rgb(accent_hex)
     # frame do fundo/recorte: parte do frame_ts pedido, mas troca por um close-up
     # do host se o rosto ali for pequeno/distante (plano aberto de evento).
     ts, host_bbox, host_area = _resolve_host_frame(
@@ -216,14 +233,15 @@ def generate_thumbnail_composite(clip: dict, video_id: str, tcfg: dict,
         if has_subject:
             cutout = _cutout(_host_crop(frame, host_bbox),
                              tcfg.get("rembg_model", "u2net"))
-            composite = _compose_subject(bg, cutout, side, w, h)
+            composite = _compose_subject(bg, cutout, side, w, h, glow_rgb=glow_rgb)
         else:
             composite = bg.convert("RGB")
 
         comp_png = clip_dir / f"{clip['id']}.thumb.comp.png"
         composite.save(comp_png)
         try:
-            _burn_text({**clip, "video_id": video_id}, comp_png, out_path, w, h, region)
+            _burn_text({**clip, "video_id": video_id}, comp_png, out_path, w, h,
+                       region, accent=accent_hex)
         finally:
             comp_png.unlink(missing_ok=True)
 

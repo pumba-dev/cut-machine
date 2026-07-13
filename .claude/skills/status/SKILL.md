@@ -40,7 +40,7 @@ Com `video_id` unico (uma conta so), mostre tambem o detalhe clip a clip: id | f
 
 Agrupe tambem por canal (`### <channel_name> (<account_id>)`, mesma ordem da secao 2). Verifique e liste ao final de cada grupo (apenas os que se aplicarem):
 
-1. **Token OAuth envelhecendo**: cheque a data de modificacao de `<credentials_dir>/token.json` da conta (campo `credentials_dir` em `config/accounts.json`, ex.: `secrets/youtube/principal`) (use `Get-Item ... | Select LastWriteTime` ou equivalente — **nunca leia o conteudo** de arquivos em `secrets/`). Se tiver **mais de 6 dias**, alerte: app OAuth em modo Testing expira o refresh token em 7 dias — rodar `python scripts/auth.py --platform youtube --account <id>` para renovar. Se `token.json` nao existe, alerte que a conta nunca autenticou.
+1. **Token OAuth envelhecendo**: cheque a data de modificacao de `<credentials_dir>/token.json` da conta (campo `credentials_dir` em `config/accounts.json`, ex.: `secrets/youtube/politica`) (use `Get-Item ... | Select LastWriteTime` ou equivalente — **nunca leia o conteudo** de arquivos em `secrets/`). Se tiver **mais de 6 dias**, alerte: app OAuth em modo Testing expira o refresh token em 7 dias — rodar `python scripts/auth.py --platform youtube --account <id>` para renovar. Se `token.json` nao existe, alerte que a conta nunca autenticou.
 2. **Clips `queued`**: ha clips aguardando quota de upload — sugerir `/publicar <video_id>` (limite diario da conta em `config/accounts.json`).
 3. **`last_error` preenchido** em algum `state.json` de video daquele canal: mostre etapa, clip e mensagem, e sugira o skill que retoma aquela fase (`/produzir` retoma o pipeline inteiro do ponto onde parou; `/renderizar` e `/publicar` retomam as fases finais).
 

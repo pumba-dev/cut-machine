@@ -18,10 +18,26 @@ import subprocess
 from .. import paths
 from ..contracts import FORMAT_RULES
 
-# Cores da miniatura em ASS (&HAABBGGRR, AA=00 opaco). Amarelo de marca #FFD93D.
-_ACCENT = "&H003DD9FF"   # amarelo
+# Cores da miniatura em ASS (&HAABBGGRR, AA=00 opaco). O accent segue a paleta
+# da CONTA (brand.accent_color): politica prata #C0C0C0, negocios neon #39FF14.
+# _ACCENT (amarelo #FFD93D) e so o fallback de contas sem accent_color.
+_ACCENT = "&H003DD9FF"   # amarelo (fallback)
 _BLACK = "&H00000000"
 _WHITE = "&H00FFFFFF"
+
+
+def _hex_to_ass(hex_color: str | None, default: str = _ACCENT) -> str:
+    """#RRGGBB (accent da conta) -> ASS &H00BBGGRR (opaco). Invalido -> default."""
+    if not isinstance(hex_color, str):
+        return default
+    h = hex_color.strip().lstrip("#")
+    if len(h) != 6:
+        return default
+    try:
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    except ValueError:
+        return default
+    return f"&H00{b:02X}{g:02X}{r:02X}"
 
 # Tamanhos/paddings por formato (relativos ao PlayRes da miniatura).
 # impact = frase amarela grande no topo; hook = chip de gancho na faixa inferior.
@@ -88,22 +104,26 @@ def _ass_escape(text: str) -> str:
     return (text or "").replace("\\", "").replace("{", "(").replace("}", ")")
 
 
-def build_thumb_ass(clip: dict, width: int, height: int, region: str = "full") -> str:
+def build_thumb_ass(clip: dict, width: int, height: int, region: str = "full",
+                    accent: str | None = None) -> str:
     """.ass da miniatura (PlayRes = resolucao da thumb).
 
-    Layout (revisado 2026-07-08): frase de IMPACTO amarela GRANDE no topo
-    (Alignment 8, ocupa boa parte da largura, quebra em 2 linhas se longa) +
-    os ganchos como CHIPS distintos empilhados na FAIXA INFERIOR — cada gancho
-    em Dialogue proprio com BorderStyle=3 (caixa opaca), cores ALTERNANDO
-    preto/amarelo e folga vertical entre eles, para o usuario ler 2 frases
-    SEPARADAS e longe da frase principal (nao mais um bloco unico embaixo dela).
+    Layout (revisado 2026-07-08): frase de IMPACTO na COR DE MARCA da conta
+    (`accent`, prata p/ politica, neon p/ negocios) GRANDE no topo (Alignment 8,
+    ocupa boa parte da largura, quebra em 2 linhas se longa) + os ganchos como
+    CHIPS distintos empilhados na FAIXA INFERIOR — cada gancho em Dialogue
+    proprio com BorderStyle=3 (caixa opaca), cores ALTERNANDO preto/accent e
+    folga vertical entre eles, para o usuario ler 2 frases SEPARADAS e longe da
+    frase principal (nao mais um bloco unico embaixo dela).
 
     `region` confina o texto a uma COLUNA (layout lateral do corte 16:9): "left"
     = impacto+chips na metade esquerda (sujeito na direita), "right" = espelho,
-    "full" (default) = comportamento classico (centro, topo/base).
+    "full" (default) = comportamento classico (centro, topo/base). `accent` e o
+    hex de marca (#RRGGBB) da conta; None cai no amarelo de fallback.
     """
     fmt = clip.get("format")
     s = _FONT_SIZES.get(fmt, _DEFAULT_SIZES)
+    accent_c = _hex_to_ass(accent)
     impact, hooks = _content(clip)
     if region != "full":  # layout lateral (corte): coluna estreita -> so 2 chips
         hooks = hooks[:1]
@@ -123,7 +143,7 @@ def build_thumb_ass(clip: dict, width: int, height: int, region: str = "full") -
 
     # Impacto: topo-centro (da coluna), contorno preto grosso + sombra leve.
     impact_style = (
-        f"Style: Impact,Arial Black,{impact_fs},{_ACCENT},{_WHITE},{_BLACK},"
+        f"Style: Impact,Arial Black,{impact_fs},{accent_c},{_WHITE},{_BLACK},"
         f"&H64000000,-1,0,0,0,100,100,0,0,1,{imp_out},{max(2, imp_out // 3)},"
         f"8,{imp_ml},{imp_mr},{top_margin},1"
     )
@@ -142,7 +162,7 @@ def build_thumb_ass(clip: dict, width: int, height: int, region: str = "full") -
         band_bottom = round(height * (0.90 if region != "full" else 0.92))
         for i, h in enumerate(hooks):
             y = band_bottom - (n - 1 - i) * step
-            box, txt = (_BLACK, _ACCENT) if i % 2 == 0 else (_ACCENT, _BLACK)
+            box, txt = (_BLACK, accent_c) if i % 2 == 0 else (accent_c, _BLACK)
             tag = (f"{{\\pos({chip_x},{y})\\an{chip_an}\\1c{txt}\\3c{box}"
                    f"\\bord{chip_pad}\\b1}}")
             events.append(
@@ -171,12 +191,14 @@ def build_thumb_ass(clip: dict, width: int, height: int, region: str = "full") -
     )
 
 
-def generate_thumbnail(clip: dict, video_id: str) -> dict:
+def generate_thumbnail(clip: dict, video_id: str, account: dict | None = None) -> dict:
     """Gera <clip_id>.thumb.jpg. Assume que a pasta do clip ja existe (render).
 
     Retorna {"path": Path, "ts": float}. Levanta em falha do ffmpeg — o
     chamador (render_clip) trata como nao-fatal para nao derrubar o clip.
+    `account` fornece a cor de marca (brand.accent_color) do texto.
     """
+    accent = ((account or {}).get("brand") or {}).get("accent_color")
     fmt = clip["format"]
     rules = FORMAT_RULES[fmt]
     width, height = (int(x) for x in rules["thumbnail_resolution"].split("x"))
@@ -187,7 +209,7 @@ def generate_thumbnail(clip: dict, video_id: str) -> dict:
     source_rel = os.path.relpath(source, clip_dir)
 
     ass_path = paths.clip_thumbnail_ass_path(video_id, clip["id"])
-    ass_path.write_text(build_thumb_ass(clip, width, height), encoding="utf-8")
+    ass_path.write_text(build_thumb_ass(clip, width, height, accent=accent), encoding="utf-8")
 
     out_path = paths.clip_thumbnail_path(video_id, clip["id"])
     out_name = "./" + out_path.name

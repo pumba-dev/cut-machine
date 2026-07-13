@@ -21,7 +21,7 @@ inscrever) e os icones ja vem EMBUTIDOS na propria arte PNG — o render NAO
 desenha texto de marca por cima. Trocar identidade = trocar o PNG.
 
 WINDOW e a posicao/tamanho do retangulo transparente da arte atual
-(assets/corte-frame/principal.png), medida UMA vez e fixada aqui. Se a arte
+(assets/corte-frame/politica.png), medida UMA vez e fixada aqui. Se a arte
 mudar a janela, remedir e atualizar WINDOW. Para remedir (ffmpeg + numpy, via
 ALPHA — a janela agora e transparente, nao preta):
     raw = subprocess.run(["ffmpeg","-v","error","-i",PNG,"-vf","scale=1920:1080",
@@ -36,7 +36,7 @@ from .frame_common import build_video_stage, even
 CANVAS_W, CANVAS_H = 1920, 1080
 
 # Janela do video (x, y, w, h) no canvas 1920x1080 = retangulo transparente da
-# arte assets/corte-frame/principal.png (medido via alpha). Video crop-to-fill
+# arte assets/corte-frame/politica.png (medido via alpha). Video crop-to-fill
 # preenche esta janela por inteiro (sem barra preta).
 WINDOW = (48, 44, 1824, 863)
 
