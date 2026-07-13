@@ -26,6 +26,7 @@ from .encoder import (
 from .intro import prepend_intro
 from . import jumpcut
 from .jumpcut_config import jumpcut_enabled, resolve_jumpcut
+from .music_mood import derive_mood
 from .outro import append_outro
 from . import reframe
 from .reframe import resolve_crop_segments
@@ -285,7 +286,8 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
     if crop_segments and abs(speed - 1.0) > 1e-6:
         crop_segments = [{**seg, "start": seg["start"] / speed, "end": seg["end"] / speed}
                          for seg in crop_segments]
-    music_path = pick_music(cfg, seed) if audio_ok else None
+    music_mood = derive_mood(clip, transcript)
+    music_path = pick_music(cfg, seed, music_mood) if audio_ok else None
     dur = content_dur
     dur_read = orig_dur * speed
     src_dur = float(src_info.get("duration_s") or 0.0)
@@ -473,7 +475,7 @@ def render_clip(clip: dict, video_id: str, transcript: dict | None = None,
     # Parametros de transformacao efetivamente aplicados (auditoria/reproducao).
     # `vcfg`, nao `cfg`: reflete os overrides reais (speed neutro sem audio,
     # zoom suprimido quando o reframe ja cropou).
-    tsum = transform_summary(vcfg, seed, speed=speed, music_path=music_path)
+    tsum = transform_summary(vcfg, seed, speed=speed, music_path=music_path, music_mood=music_mood)
     if tsum:
         info["transform"] = tsum
     if reframe_info:

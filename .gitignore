@@ -12,3 +12,10 @@ __pycache__/
 # Vinhetas de fim (assets de marca por conta) — versionadas como as molduras PNG.
 !assets/short-end/*.mp4
 !assets/corte-end/*.mp4
+# Pool de musica compartilhado (assets/music/): faixas nao versionadas (centenas
+# de MB), so os metadados/relatorio do classify_music.py ficam trackeados.
+assets/music/**/*.mp3
+assets/music/**/*.wav
+assets/music/**/*.ogg
+assets/music/**/*.flac
+!assets/music/**/README.md

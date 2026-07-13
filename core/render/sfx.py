@@ -5,7 +5,7 @@ reframe dinamico (core.render.reframe) -- reforca a sensacao de edicao alem
 do corte visual (mais um sinal de conteudo transformado, nao so cosmetico).
 Escolha da faixa deterministica por clip (mesmo esquema de seed de
 core.render.transform.pick_music); pasta precisa ser livre de claim
-(`reframe.sfx_dir`, irmao de `transform.music_dir`).
+(`reframe.sfx_dir`, mesmo espirito do pool compartilhado de `assets/music/`).
 """
 import hashlib
 from pathlib import Path

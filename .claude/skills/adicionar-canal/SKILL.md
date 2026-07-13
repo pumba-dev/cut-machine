@@ -114,7 +114,7 @@ Template completo — todo bloco além de `platform`/`id`/`credentials_dir` é
     "speed": 1.02,
     "pitch_semitones": 0.3,
     "eq": true,
-    "music_dir": "assets/music/<id>",
+    "music": true,
     "music_volume": 0.02,
     "music_lufs": -16,
     "color": { "contrast": 1.05, "saturation": 1.1, "gamma": 0.98 },
@@ -178,7 +178,10 @@ copywriter lê `references/padrao-copy.md` (universal) **+** esse arquivo. Perfi
 
 Convenção: `assets/<tipo>/<id>.<ext>` — `short-frame`/`corte-frame` (PNG, moldura
 com janela transparente onde o vídeo entra), `short-end`/`corte-end` (MP4,
-vinheta de fim, opcional), `music/<id>/` (pasta de faixas, opcional).
+vinheta de fim, opcional). Música **não** é por conta: é um pool compartilhado
+em `assets/music/` (subpastas `agressiva`/`neutra`/`calma`, geradas por
+`scripts/classify_music.py`) — o canal novo só precisa de `transform.music: true`
+(ou `false` pra ficar sem música) pra usar o pool que já existe.
 
 **Sem arte customizada ainda?** Funciona hoje mesmo sem nenhum PNG: `brand`
 ausente ou `short_frame`/`corte_frame` vazios caem no fallback de cor chapada

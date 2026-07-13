@@ -30,8 +30,10 @@ from pathlib import Path
 
 from .. import paths
 
-# Extensoes de audio aceitas em music_dir.
-_MUSIC_EXTS = (".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac")
+# Pool compartilhado de musica (nao mais por conta) + extensoes aceitas.
+MUSIC_ROOT = paths.ROOT / "assets" / "music"
+MUSIC_EXTS = (".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac")
+_MUSIC_MOODS = ("agressiva", "neutra", "calma")
 
 # Amplitude MAXIMA do jitter por parametro (multiplicada por `jitter` da conta e
 # por um sinal em [-1, 1) derivado do seed). Mantido pequeno de proposito.
@@ -61,7 +63,7 @@ TRANSFORM_DEFAULTS = {
     "eq_notch": False,       # dip 5-8kHz na "assinatura de voz" (requer eq); off por padrao
     "eq_notch_db": -3.0,     # profundidade do notch em dB (negativo); clamp [-5, 0]
     "noise": 0.0,            # grain de luma temporal por frame; 0 = off (pixels distintos por frame)
-    "music_dir": "",         # "" = off
+    "music": False,          # False = off; liga a musica do pool compartilhado assets/music/
     "music_volume": 0.20,    # ganho (trim) apos a normalizacao; a voz sempre tem prioridade
     "music_lufs": -16.0,     # alvo de loudness da musica (loudnorm) — iguala faixas de loudness diferente
     "color": None,           # dict {contrast,brightness,saturation,gamma} = off se None
@@ -326,25 +328,37 @@ def build_audio_graph(cfg: dict, seed: int, *, music_index: int | None = None,
     )
 
 
-def pick_music(cfg: dict, seed: int) -> str | None:
-    """Caminho absoluto de uma faixa de `music_dir`, escolhida deterministicamente.
+def _music_files_in(d: Path) -> list[Path]:
+    if not d.is_dir():
+        return []
+    return sorted(p for p in d.iterdir() if p.is_file() and p.suffix.lower() in MUSIC_EXTS)
 
-    None se `music_dir` vazio/inexistente ou sem faixas — musica desligada sem erro.
+
+def pick_music(cfg: dict, seed: int, mood: str = "neutra") -> str | None:
+    """Caminho absoluto de uma faixa do pool compartilhado `assets/music/<mood>/`,
+    escolhida deterministicamente (mesmo seed de sempre -> mesmo clip_id sempre
+    pega a mesma faixa).
+
+    None se `cfg["music"]` for falsy (opt-in explicito por conta) ou se nao
+    houver nenhuma faixa em lugar nenhum -- musica desligada sem erro. `mood`
+    (core.render.music_mood.derive_mood) cai em cascata se a pasta pedida
+    estiver ausente/vazia: `mood` -> "neutra" -> uniao achatada dos 3 moods.
     """
-    d = cfg.get("music_dir")
-    base = _resolve_path(d) if isinstance(d, str) else None
-    if base is None or not Path(base).is_dir():
+    if not cfg.get("music"):
         return None
-    files = sorted(
-        p for p in Path(base).iterdir()
-        if p.is_file() and p.suffix.lower() in _MUSIC_EXTS
-    )
+    mood = mood if mood in _MUSIC_MOODS else "neutra"
+    files = _music_files_in(MUSIC_ROOT / mood)
+    if not files and mood != "neutra":
+        files = _music_files_in(MUSIC_ROOT / "neutra")
+    if not files:
+        files = sorted(p for m in _MUSIC_MOODS for p in _music_files_in(MUSIC_ROOT / m))
     if not files:
         return None
     return str(files[_rand_int(seed, "music", len(files))].resolve())
 
 
-def summary(cfg: dict, seed: int, *, speed: float, music_path: str | None) -> dict:
+def summary(cfg: dict, seed: int, *, speed: float, music_path: str | None,
+            music_mood: str | None = None) -> dict:
     """Resumo dos parametros EFETIVOS aplicados (para render.transform)."""
     ratio = _pitch_ratio(cfg, seed)
     out: dict = {}
@@ -369,4 +383,6 @@ def summary(cfg: dict, seed: int, *, speed: float, music_path: str | None) -> di
     if music_path:
         out["music"] = Path(music_path).name
         out["music_volume"] = round(_music_volume(cfg, seed), 4)
+        if music_mood:
+            out["music_mood"] = music_mood
     return out
