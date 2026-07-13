@@ -9,11 +9,16 @@ construcao.
 - Config por conta em config/accounts.json, bloco opcional "transform" (irmao de
   "brand"). Campos ausentes caem em TRANSFORM_DEFAULTS (tudo NEUTRO) -> conta sem
   o bloco nao sofre nenhuma mudanca (regressao zero).
-- Jitter POR CLIP: cada parametro ativo varia um pouco em torno da base, com
-  amplitude `jitter`, de forma DETERMINISTICA (seed = hash do clip_id). Mesmo
-  clip -> mesmo resultado (idempotente); clips diferentes -> parametros
-  diferentes. `jitter=0` desliga a variacao (valores fixos da conta).
-- So parametros ATIVOS (base != neutro) sofrem jitter: "off" continua off.
+- VARIACAO POR CLIP (identidade unica): cada parametro numerico pode vir como
+  RANGE `{"min": a, "max": b}` -> cada clip sorteia UM valor uniforme em [a, b]
+  de forma DETERMINISTICA (seed = hash do clip_id). Clips diferentes pegam
+  valores diferentes (cada corte tecnicamente distinto do outro); re-render do
+  mesmo clip da o mesmo valor (idempotente, como o resto do pipeline). Ou como
+  ESCALAR (valor fixo) — nesse caso a variacao vem do `jitter` legado (amplitude
+  relativa em torno da base, mesmo seed; `jitter=0` = totalmente fixo). Os dois
+  modos convivem por parametro; ranges IGNORAM jitter (o range ja e a variacao).
+- So parametros ATIVOS (base/range != neutro) variam: "off" continua off. Os
+  limites duros (_SPEED_MIN etc.) clampam por cima do sorteio.
 
 Invariantes:
 - Video: velocidade via `setpts=PTS/speed`; zoom via `crop=iw/Z:ih/Z` (crop-in
@@ -137,50 +142,80 @@ def _jitter_delta(cfg: dict, seed: int, key: str) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Range por parametro (identidade unica por clip)
+# ---------------------------------------------------------------------------
+# Um parametro numerico pode vir como ESCALAR (valor fixo + jitter, compat com
+# configs antigas) OU como {"min": a, "max": b} — nesse caso cada clip sorteia
+# UM valor uniforme em [a, b] de forma DETERMINISTICA (seed = clip_id): clips
+# diferentes pegam valores diferentes (identidade unica), mas re-renderizar o
+# mesmo clip da o mesmo valor (idempotente, como o resto do pipeline). O jitter
+# NAO se aplica a params em range (o range JA e a variacao). Os limites duros
+# (_SPEED_MIN etc.) continuam clampando por cima do sorteio.
+
+def _range_ends(v, default: float) -> tuple[float, float]:
+    """(lo, hi) de um valor escalar (lo==hi) ou de um dict {min,max}."""
+    if isinstance(v, dict):
+        lo = _as_float(v.get("min"), default)
+        hi = _as_float(v.get("max"), lo)
+        return (min(lo, hi), max(lo, hi))
+    f = _as_float(v, default)
+    return (f, f)
+
+
+def _sample(cfg: dict, seed: int, key: str, default: float) -> float:
+    """Valor-base efetivo do parametro, com a variacao por clip ja embutida:
+    range {min,max} -> sorteio uniforme deterministico; escalar -> valor + jitter.
+    NAO clampa nos limites duros nem trata 'off' (o chamador faz)."""
+    v = cfg.get(key, default)
+    if isinstance(v, dict):
+        lo, hi = _range_ends(v, default)
+        return lo + _rand01(seed, key) * (hi - lo)
+    return _as_float(v, default) + _jitter_delta(cfg, seed, key)
+
+
+# ---------------------------------------------------------------------------
 # Parametros efetivos
 # ---------------------------------------------------------------------------
 
 def speed_factor(cfg: dict, seed: int) -> float:
     """Fator de velocidade efetivo (1.0 = sem alteracao)."""
-    base = _clamp(_as_float(cfg.get("speed"), 1.0), _SPEED_MIN, _SPEED_MAX)
-    if abs(base - 1.0) < 1e-6:
+    lo, hi = _range_ends(cfg.get("speed", 1.0), 1.0)
+    if abs(lo - 1.0) < 1e-6 and abs(hi - 1.0) < 1e-6:
         return 1.0
-    return _clamp(base + _jitter_delta(cfg, seed, "speed"), _SPEED_MIN, _SPEED_MAX)
+    return _clamp(_sample(cfg, seed, "speed", 1.0), _SPEED_MIN, _SPEED_MAX)
 
 
 def _pitch_ratio(cfg: dict, seed: int) -> float:
     """Razao de frequencia do pitch (1.0 = sem alteracao)."""
-    semi = _as_float(cfg.get("pitch_semitones"), 0.0)
-    if abs(semi) < 1e-6:
+    lo, hi = _range_ends(cfg.get("pitch_semitones", 0.0), 0.0)
+    if abs(lo) < 1e-6 and abs(hi) < 1e-6:
         return 1.0
-    semi += _jitter_delta(cfg, seed, "pitch_semitones")
+    semi = _sample(cfg, seed, "pitch_semitones", 0.0)
     return 2.0 ** (semi / 12.0)
 
 
 def _zoom(cfg: dict, seed: int) -> float:
-    base = _as_float(cfg.get("zoom"), 1.0)
-    if base <= 1.0 + 1e-6:
+    lo, hi = _range_ends(cfg.get("zoom", 1.0), 1.0)
+    if hi <= 1.0 + 1e-6:
         return 1.0
-    return _clamp(base + _jitter_delta(cfg, seed, "zoom"), 1.0, _ZOOM_MAX)
+    return _clamp(_sample(cfg, seed, "zoom", 1.0), 1.0, _ZOOM_MAX)
 
 
 def _noise(cfg: dict, seed: int) -> float:
     """Forca efetiva do grain de video (0 = off)."""
-    base = _as_float(cfg.get("noise"), 0.0)
-    if base <= 1e-6:
+    lo, hi = _range_ends(cfg.get("noise", 0.0), 0.0)
+    if hi <= 1e-6:
         return 0.0
-    return _clamp(base + _jitter_delta(cfg, seed, "noise"), 0.0, _NOISE_MAX)
+    return _clamp(_sample(cfg, seed, "noise", 0.0), 0.0, _NOISE_MAX)
 
 
 def _notch_db(cfg: dict, seed: int) -> float:
     """Ganho efetivo do notch 5-8kHz em dB (negativo; 0 = sem dip)."""
-    base = _as_float(cfg.get("eq_notch_db"), -3.0)
-    return _clamp(base + _jitter_delta(cfg, seed, "eq_notch_db"), _NOTCH_DB_MIN, 0.0)
+    return _clamp(_sample(cfg, seed, "eq_notch_db", -3.0), _NOTCH_DB_MIN, 0.0)
 
 
 def _music_volume(cfg: dict, seed: int) -> float:
-    base = _as_float(cfg.get("music_volume"), 0.08)
-    return _clamp(base + _jitter_delta(cfg, seed, "music_volume"), 0.0, 0.5)
+    return _clamp(_sample(cfg, seed, "music_volume", 0.08), 0.0, 0.5)
 
 
 def _music_lufs(cfg: dict) -> float:
@@ -215,12 +250,19 @@ def _color_filter(cfg: dict, seed: int) -> str:
     color = cfg.get("color")
     if not isinstance(color, dict):
         return ""
+    # Neutro de cada canal do filtro eq (usado como default do range).
+    _NEUTRAL = {"contrast": 1.0, "brightness": 0.0, "saturation": 1.0, "gamma": 1.0}
     params: list[str] = []
     for key in ("contrast", "brightness", "saturation", "gamma"):
         v = color.get(key)
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
+        if isinstance(v, dict):  # range {min,max}: sorteio deterministico por clip
+            lo, hi = _range_ends(v, _NEUTRAL[key])
+            vj = lo + _rand01(seed, f"color.{key}") * (hi - lo)
+        elif isinstance(v, (int, float)) and not isinstance(v, bool):  # escalar + jitter
             vj = float(v) + _jitter_delta(cfg, seed, key)
-            params.append(f"{key}={vj:.4f}")
+        else:
+            continue
+        params.append(f"{key}={vj:.4f}")
     return "eq=" + ":".join(params) if params else ""
 
 
