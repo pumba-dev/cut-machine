@@ -11,6 +11,7 @@ whisperX) + suavizacao por sentenca via voto majoritario — obrigatoria
 porque timestamps do faster-whisper derrapam centenas de ms perto de
 trocas de turno.
 """
+import os
 import subprocess
 import sys
 import tarfile
@@ -45,6 +46,16 @@ EMB_MODEL = DIARIZE_MODELS_DIR / "nemo_en_titanet_large.onnx"
 # proximo no tempo — sobra o numero real de falantes (2/3), sem arco-iris.
 AUTO_MAX_SPEAKERS = 6
 MIN_SPEAKER_SHARE = 0.08
+
+# Threads da diarizacao (onnxruntime CPU). Defaults 2/4 (seg/emb). MEDIDO
+# (12-core, clip de 10min): subir threads NAO acelera — 2/4=158s, 3/6=154s,
+# 4/8=168s (pior), e o resultado e byte-identico (mesmo hash de turns). O
+# workload nao e thread-bound (dependencia sequencial por chunk). Deixado
+# overridavel por env so pra experimentacao futura noutra maquina; nao mexa sem
+# medir. A diarizacao roda concorrente com o whisper (GPU) no caminho normal
+# (core.transcribe.whisper_local), entao seu custo fica escondido sob o whisper.
+_SEG_THREADS = int(os.environ.get("DIARIZE_SEG_THREADS") or 0) or 2
+_EMB_THREADS = int(os.environ.get("DIARIZE_EMB_THREADS") or 0) or 4
 
 # Palavras a menos de 0.25s de uma fronteira de turno sao pouco confiaveis
 # (drift do whisper); sentenca inteira vai para o falante majoritario.
@@ -172,11 +183,11 @@ def diarize_turns(video: Path, num_speakers: int = -1) -> list[dict]:
         segmentation=sherpa_onnx.OfflineSpeakerSegmentationModelConfig(
             pyannote=sherpa_onnx.OfflineSpeakerSegmentationPyannoteModelConfig(
                 model=str(SEG_MODEL)),
-            num_threads=2,
+            num_threads=_SEG_THREADS,
         ),
         embedding=sherpa_onnx.SpeakerEmbeddingExtractorConfig(
             model=str(EMB_MODEL),
-            num_threads=4,
+            num_threads=_EMB_THREADS,
         ),
         clustering=sherpa_onnx.FastClusteringConfig(
             # auto: teto folgado + merge do ruido depois. Fixo: exatamente N.

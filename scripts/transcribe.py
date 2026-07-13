@@ -21,6 +21,9 @@ def main() -> None:
                         help="pula a diarizacao de falantes (legendas ficam em cor unica)")
     parser.add_argument("--speakers", type=int, default=-1,
                         help="numero de falantes, se conhecido (melhora o clustering)")
+    parser.add_argument("--batch-size", type=int, default=4,
+                        help="lotes paralelos na GPU (>1 usa BatchedInferencePipeline; "
+                             "1 = modo streaming legado). CPU ignora (sempre streaming)")
     args = parser.parse_args()
 
     st_path = state_path(args.video_id)
@@ -38,7 +41,8 @@ def main() -> None:
     if not video.exists():
         fail(f"video fonte nao encontrado: {video}", video_id=args.video_id)
 
-    state.set_stage(st, "transcribe", "running", model=args.model, device=args.device)
+    state.set_stage(st, "transcribe", "running", model=args.model, device=args.device,
+                    batch_size=args.batch_size)
     state.save(st_path, st)
 
     try:
@@ -46,6 +50,7 @@ def main() -> None:
             video, args.video_id,
             model=args.model, device=args.device, compute=args.compute,
             diarize=not args.no_diarize, num_speakers=args.speakers,
+            batch_size=args.batch_size,
         )
     except Exception as exc:
         state.set_stage(st, "transcribe", "failed")

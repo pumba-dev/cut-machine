@@ -27,7 +27,7 @@ python scripts/transcribe.py --video-id <video_id>
 python scripts/analyze_faces.py --video-id <video_id> [--account <conta>]
 ```
 
-Sequencial (transcribe depende de `source.mp4`). Nao passe `--model/--device/--compute` a menos que o usuario peca — os defaults ja sao os corretos para a GPU local.
+Sequencial (transcribe depende de `source.mp4`). Nao passe `--model/--device/--compute/--batch-size` a menos que o usuario peca — os defaults ja sao os corretos para a GPU local (batched na GPU + diarizacao concorrente; ~1.6x sobre o modo antigo). Se o usuario priorizar **velocidade** sobre precisao de timestamp: `--model deepdml/faster-whisper-large-v3-turbo-ct2 --batch-size 8` (turbo, ~21x realtime; baixa o modelo no 1o uso). Se der OOM de GPU, `--batch-size 2` (a guarda ja auto-halva, mas pode forcar).
 
 `analyze_faces.py` e a fase **`faces`** (opt-in): detecta rosto/emocao no source (CPU, minutos) e escreve `faces.json`. Sempre pode ser chamado — se a conta nao tem `thumbnail.face_aware`, ele retorna `{"skipped": true}` (no-op); se a deteccao falhar, degrada (`degraded: true`) e o pipeline segue com a thumb ASS local. Nao bloqueia nada.
 

@@ -8,6 +8,7 @@ ganham `spk`, segmentos ganham `speaker` e o transcript ganha `speakers`.
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ..paths import transcript_compact_path, transcript_path, transcript_srt_path
@@ -81,46 +82,95 @@ def transcribe_video(
     compute: str = "int8",
     diarize: bool = True,
     num_speakers: int = -1,
+    batch_size: int = 4,
 ) -> dict:
-    """Transcreve o video e grava os tres artefatos no workspace. Retorna resumo."""
+    """Transcreve o video e grava os tres artefatos no workspace. Retorna resumo.
+
+    batch_size > 1 (e device efetivo cuda) usa BatchedInferencePipeline: chunks
+    entre janelas de VAD sao decodificados em paralelo na GPU (~2.5-4x em Turing
+    int8). O caminho batched forca condition_on_previous_text=False por
+    construcao — mata os loops de repeticao/alucinacao em audio longo (ganho de
+    qualidade de graca). batch_size <= 1, ou fallback CPU, cai no stream
+    single-pass classico (byte-identico ao comportamento antigo).
+
+    A diarizacao (CPU, sherpa-onnx) depende SO do audio, nao do transcript, entao
+    roda numa thread concorrente com o Whisper (GPU) quando o device efetivo e
+    cuda: o wall-clock cai de whisper+diarize para max(whisper, diarize). No
+    fallback CPU roda sequencial (evita contenda CPU-vs-CPU).
+    """
     whisper, effective = load_model(model=model, device=device, compute=compute)
-    segments_gen, info = whisper.transcribe(
-        str(video_path),
-        language="pt",
-        word_timestamps=True,
-        vad_filter=True,
-        beam_size=5,
-    )
 
-    segments: list[dict] = []
-    total_words = 0
-    for seg in segments_gen:
-        words = [
-            {
-                "w": w.word.strip(),
-                "start": round(w.start, 3),
-                "end": round(w.end, 3),
-                "prob": round(w.probability, 3),
-            }
-            for w in (seg.words or [])
-        ]
-        total_words += len(words)
-        segments.append({
-            "id": seg.id,
-            "start": round(seg.start, 3),
-            "end": round(seg.end, 3),
-            "text": seg.text.strip(),
-            "words": words,
-        })
+    # Diarizacao concorrente: submete a thread ANTES do loop do Whisper. O gate
+    # depende do device EFETIVO (so conhecido pos-load: `auto` pode cair pra CPU).
+    diarize_turns = assign_speakers = None
+    if diarize:
+        from ..diarize import assign_speakers, diarize_turns
+    overlap = diarize and effective["device"] == "cuda"
+    executor = None
+    diar_future = None
+    if overlap:
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="diarize")
+        diar_future = executor.submit(diarize_turns, video_path, num_speakers)
 
-    # Diarizacao pos-whisper: grava spk por palavra e speaker por segmento.
+    try:
+        common = dict(language="pt", word_timestamps=True, vad_filter=True, beam_size=5)
+        if batch_size > 1 and effective["device"] == "cuda":
+            from faster_whisper import BatchedInferencePipeline
+            bs = batch_size
+            while True:
+                try:
+                    pipeline = BatchedInferencePipeline(whisper)
+                    segments_gen, info = pipeline.transcribe(str(video_path), batch_size=bs, **common)
+                    break
+                except RuntimeError as exc:  # ct2 sinaliza OOM como RuntimeError
+                    if "out of memory" in str(exc).lower() and bs > 1:
+                        bs = max(1, bs // 2)
+                        # Contexto CUDA fica sujo pos-OOM: recarrega os pesos antes de tentar de novo.
+                        whisper, effective = load_model(model=model, device=device, compute=compute)
+                        continue
+                    raise
+            effective["batch_size"] = bs
+        else:
+            segments_gen, info = whisper.transcribe(str(video_path), **common)
+            effective["batch_size"] = 1
+
+        segments: list[dict] = []
+        total_words = 0
+        for seg in segments_gen:
+            words = [
+                {
+                    "w": w.word.strip(),
+                    "start": round(w.start, 3),
+                    "end": round(w.end, 3),
+                    "prob": round(w.probability, 3),
+                }
+                for w in (seg.words or [])
+            ]
+            total_words += len(words)
+            segments.append({
+                "id": seg.id,
+                "start": round(seg.start, 3),
+                "end": round(seg.end, 3),
+                "text": seg.text.strip(),
+                "words": words,
+            })
+    finally:
+        # Nunca vaza a thread de diarize — junta mesmo se o loop do Whisper levantar.
+        if executor is not None:
+            executor.shutdown(wait=True)
+
+    # Diarizacao: grava spk por palavra e speaker por segmento.
     # Falha aqui nao derruba a transcricao — legendas caem em cor unica.
+    # future.result() re-levanta a excecao da thread DENTRO deste try (overlap) —
+    # mesmo padrao de degradacao do caminho sequencial.
     speakers = 0
     diarize_error = None
     if diarize:
         try:
-            from ..diarize import assign_speakers, diarize_turns
-            turns = diarize_turns(video_path, num_speakers=num_speakers)
+            if diar_future is not None:  # overlapped (cuda)
+                turns = diar_future.result()
+            else:                        # sequencial (cpu / fallback)
+                turns = diarize_turns(video_path, num_speakers=num_speakers)
             speakers = assign_speakers(segments, turns)
         except Exception as exc:  # noqa: BLE001 — degradacao intencional
             diarize_error = str(exc)
@@ -150,6 +200,7 @@ def transcribe_video(
         "duration": duration,
         "device": effective["device"],
         "model": effective["model"],
+        "batch_size": effective.get("batch_size", 1),
         "speakers": speakers,
     }
     if diarize_error:
